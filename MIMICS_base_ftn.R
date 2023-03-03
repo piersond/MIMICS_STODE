@@ -64,6 +64,9 @@ fPHYS_MULT = 1
 ###########################################
 MIMICS1 <- function(df){
   
+  #DEBUG
+  #df = data[1,]
+  
   ### Setup a var to collect run notes
   note <- ""
   
@@ -85,12 +88,6 @@ MIMICS1 <- function(df){
   ## Option A: Defualt fMET equation using lig:N values
   #fMET <- fmet_p[1] * (fmet_p[2] - fmet_p[3] * lig_N) 
   
-  ## If lignin:N data is missing, use a specified value
-  # if(lig_N == 0) {
-  #    fMET <- 0.6979 #<--sagebrush litter  value
-  #    print("Using default fMET")
-  #    } 
-  
   ## Option B: LTER "SHORTCUT" fMET value (average from LiDET)
   fMET <- 0.3846423
   
@@ -111,6 +108,7 @@ MIMICS1 <- function(df){
   Tau_MOD2 <- Tau_MOD[4]                        
   Tau_MOD1[Tau_MOD1 < Tau_MOD[2]] <- Tau_MOD[2]
   Tau_MOD1[Tau_MOD1 > Tau_MOD[3]] <- Tau_MOD[3] 
+  
   tau <- c(tau_r[1]*exp(tau_r[2]*fMET), 
            tau_K[1]*exp(tau_K[2]*fMET))   
   tau <- tau * Tau_MOD1 * Tau_MOD2 * Tau_MULT 
@@ -120,12 +118,14 @@ MIMICS1 <- function(df){
   fCHEM    <- c(fCHEM_r[1] * exp(fCHEM_r[2]*fMET) * fCHEM_r[3], 
                 fCHEM_K[1] * exp(fCHEM_K[2]*fMET) * fCHEM_K[3]) 	
   fAVAI    <- 1 - (fPHYS + fCHEM)
+  
   desorb   <- fSOM_p[1] * exp(fSOM_p[2]*(fCLAY))                  
   
   desorb <- desorb * desorb_MULT
   fPHYS <- fPHYS * fPHYS_MULT
   
   pSCALAR  <- PHYS_scalar[1] * exp(PHYS_scalar[2]*(sqrt(fCLAY)))  #Scalar for texture effects on SOMp
+  
   v_MOD    <- vMOD  
   k_MOD    <- kMOD 
   k_MOD[3] <- k_MOD[3] * pSCALAR    
@@ -134,7 +134,7 @@ MIMICS1 <- function(df){
   VMAX     <- Vmax * v_MOD 
   KM       <- Km / k_MOD
   
-  #initialize pools
+  #----------initialize pools---------------
   I       <- array(NA, dim=2)             
   I[1]    <- (EST_LIT / depth) * fMET     
   I[2]    <- (EST_LIT / depth) * (1-fMET)
@@ -155,6 +155,7 @@ MIMICS1 <- function(df){
               fPHYS = fPHYS, fCHEM = fCHEM, fAVAI = fAVAI, FI = FI, 
               tau = tau, LITmin = LITmin, SOMmin = SOMmin, MICtrn = MICtrn, 
               desorb = desorb, DEsorb = DEsorb, OXIDAT = OXIDAT, KO = KO)
+  
   Ty    <- c( LIT_1 = lit[1], LIT_2 = lit[2], 
               MIC_1 = mic[1], MIC_2 = mic[2], 
               SOM_1 = som[1], SOM_2 = som[2], SOM_3 = som[3])
@@ -174,6 +175,7 @@ MIMICS1 <- function(df){
   .GlobalEnv$DEsorb <- DEsorb
   .GlobalEnv$OXIDAT <- OXIDAT
   
+  # ------------RUN THE MODEL-------------
   test  <- stode(y = Ty, time = 1e6, fun = RXEQ, parms = Tpars, positive = TRUE)
   
   ### Calc and get MIMICS output 
@@ -228,10 +230,10 @@ MIMout_single <- MIMICS1(data[1,])
 ###############################################
 #>  Dataset run from .csv
 ###############################################
-data <- data <- read.csv("LTER_SITE_1.csv", as.is=T)
+data <- read.csv("LTER_SITE_1.csv", as.is=T)
 
 MIMrun <- data %>% split(1:nrow(data)) %>% map(~ MIMICS1(df=.)) %>% bind_rows()
-MIMrun <- data[,1:2] %>% cbind(MIMrun) %>% select(-Site) # Bind data info columns to MIMICS output
+MIMrun <- data[,1:2] %>% cbind(MIMrun %>% select(-Site))  # Bind data info columns to MIMICS output
 
 
 #################################################
@@ -260,3 +262,4 @@ ggplot(plot_data, aes(x=MIMSOC, y=SOC, color=TSOI)) +
   annotate("text", label = paste0("RMSE = ", rmse), x = 2, y = 7.4, size = 4, colour = "black") +
   ylim(0,10) + xlim(0,10) +
   theme_minimal()
+
