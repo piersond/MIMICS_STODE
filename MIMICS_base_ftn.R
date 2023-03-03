@@ -50,14 +50,14 @@ fPHYS_MULT = 1
 ########################################
 # Apply parameter multipliers
 ########################################
-Vslope = Vslope * 1.693578
-Vint = Vint * 0.633318
-Kslope = Kslope * 1.782366
-Kint = Kint * 0.3609913
-CUE = CUE * 1
-Tau_MULT = 1
-desorb_MULT = 2.3635554
-fPHYS_MULT = 2.0716163
+# Vslope = Vslope * 1.693578
+# Vint = Vint * 0.633318
+# Kslope = Kslope * 1.782366
+# Kint = Kint * 0.3609913
+# CUE = CUE * 1
+# Tau_MULT = 1
+# desorb_MULT = 2.3635554
+# fPHYS_MULT = 2.0716163
 
 ###########################################
 # MIMICS single point function
