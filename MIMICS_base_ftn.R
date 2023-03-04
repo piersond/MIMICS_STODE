@@ -9,6 +9,8 @@ library(purrr)
 library(ggplot2)
 library(Metrics)
 
+library(deSolve)
+
 #bring in RXEQ function
 source("RXEQ_ftn.R")
 
@@ -62,10 +64,11 @@ fPHYS_MULT = 1
 ###########################################
 # MIMICS single point function
 ###########################################
-MIMICS1 <- function(df){
+#MIMICS1 <- function(df){
   
   #DEBUG
-  #df = data[1,]
+  data <- read.csv("LTER_SITE_1.csv", as.is=T)
+  df = data[5,]
   
   ### Setup a var to collect run notes
   note <- ""
@@ -178,88 +181,51 @@ MIMICS1 <- function(df){
   # ------------RUN THE MODEL-------------
   test  <- stode(y = Ty, time = 1e6, fun = RXEQ, parms = Tpars, positive = TRUE)
   
-  ### Calc and get MIMICS output 
-  MIMLIT    <- (test[[1]][[1]]+test[[1]][[2]])  * depth *1e4 / 1e6 #convert kgC/m2 from mgC/cm3 (0-30 cm) 
-  MIMMIC    <- (test[[1]][[3]]+test[[1]][[4]])  * depth *1e4 / 1e6
-  MIM_CO    <-  test[[1]][[3]]/test[[1]][[4]]
-  MIMSOC    <- sum(test[[1]])  * depth *1e4 / 1e6   
+  # ### Calc and get MIMICS output 
+  # MIMLIT    <- (test[[1]][[1]]+test[[1]][[2]])  * depth *1e4 / 1e6 #convert kgC/m2 from mgC/cm3 (0-30 cm) 
+  # MIMMIC    <- (test[[1]][[3]]+test[[1]][[4]])  * depth *1e4 / 1e6
+  # MIM_CO    <-  test[[1]][[3]]/test[[1]][[4]]
+  # MIMSOC    <- sum(test[[1]])  * depth *1e4 / 1e6   
+  # 
+  # table <- as.numeric(test[[1]])
+  # 
+  # MIMout <- data.frame(Site = df$Site,
+  #                      fCLAY = fCLAY,
+  #                      TSOI = TSOI,
+  #                      ANPP = ANPP,
+  #                      LIGN = lig_N,
+  #                      EST_LIT = EST_LIT,
+  #                      MIMSOC = MIMSOC,
+  #                      MIMMIC = MIMMIC,
+  #                      MIMLIT = MIMLIT,
+  #                      MIM_CO = MIM_CO,
+  #                      desorb = as.numeric(desorb),
+  #                      SOMpTOv = 1/(as.numeric(desorb)*24*365), #convert from per hr to per yr
+  #                      LITm = table[1] * depth *1e4 / 1e6, #convert kgC/m2 from mgC/cm3 (0-30 cm) 
+  #                      LITs = table[2] * depth *1e4 / 1e6,
+  #                      MICr = table[3] * depth *1e4 / 1e6,
+  #                      MICK = table[4] * depth *1e4 / 1e6,
+  #                      SOMp = table[5] * depth *1e4 / 1e6,
+  #                      SOMc = table[6] * depth *1e4 / 1e6,
+  #                      SOMa = table[7] * depth *1e4 / 1e6,
+  #                      #CO2r = table[8],
+  #                      #CO2r = table[9],
+  #                      DEBUG = note)
+#  return(MIMout)
+#}
+
+  t_sol_ss = ode(
+    y = Ty,
+    times = c(seq(1,1e7,10000)),
+    func = RXEQ,
+    parms = c(), 
+    method = "ode45")
+
+  sol = as.data.frame(t_sol_ss)
   
-  table <- as.numeric(test[[1]])
+  plot(sol$time, sol$SOM_3)
   
-  MIMout <- data.frame(Site = df$Site,
-                       fCLAY = fCLAY,
-                       TSOI = TSOI,
-                       ANPP = ANPP,
-                       LIGN = lig_N,
-                       EST_LIT = EST_LIT,
-                       MIMSOC = MIMSOC,
-                       MIMMIC = MIMMIC,
-                       MIMLIT = MIMLIT,
-                       MIM_CO = MIM_CO,
-                       desorb = as.numeric(desorb),
-                       SOMpTOv = 1/(as.numeric(desorb)*24*365), #convert from per hr to per yr
-                       LITm = table[1] * depth *1e4 / 1e6, #convert kgC/m2 from mgC/cm3 (0-30 cm) 
-                       LITs = table[2] * depth *1e4 / 1e6,
-                       MICr = table[3] * depth *1e4 / 1e6,
-                       MICK = table[4] * depth *1e4 / 1e6,
-                       SOMp = table[5] * depth *1e4 / 1e6,
-                       SOMc = table[6] * depth *1e4 / 1e6,
-                       SOMa = table[7] * depth *1e4 / 1e6,
-                       #CO2r = table[8],
-                       #CO2r = table[9],
-                       DEBUG = note)
-  return(MIMout)
-}
+  sol$SOM_3[nrow(sol)]
 
-#####################
-# Example use of 
-#####################
-
-###############################################
-#> Single point run
-###############################################
-data <- data.frame(Site = 1,
-                   ANPP = 141,
-                   TSOI = -7.0,
-                   CLAY = 5,
-                   lig_N = 0)
-
-MIMout_single <- MIMICS1(data[1,])
-
-
-###############################################
-#>  Dataset run from .csv
-###############################################
-data <- read.csv("LTER_SITE_1.csv", as.is=T)
-
-MIMrun <- data %>% split(1:nrow(data)) %>% map(~ MIMICS1(df=.)) %>% bind_rows()
-MIMrun <- data[,1:2] %>% cbind(MIMrun %>% select(-Site))  # Bind data info columns to MIMICS output
-
-
-#################################################
-#> Plot SOC vs MIMSOC
-#################################################
-
-plot_data <- MIMrun
-
-#calc SOMp turnover time
-plot_data$desorb_yr <- plot_data$desorb*24*365
-plot_data$SOMpTO <- plot_data$SOMp/plot_data$desorb_yr
-
-# Calc SOC vs. MIMSOC r2 and RMSE
-r2_test <- cor.test(MIMrun$SOC, MIMrun$MIMSOC)
-r_val <- round(as.numeric(unlist(r2_test ['estimate'])),2)
-lb2 <- paste("R^2 == ", r_val)
-
-rmse <- round(rmse(plot_data$SOC, plot_data$MIMSOC),2)
-
-# Plot SOC vs. MIMSOC
-ggplot(plot_data, aes(x=MIMSOC, y=SOC, color=TSOI)) +
-  geom_abline(intercept = 0, slope = 1, linetype = "dashed")+
-  geom_point(size=4, alpha=0.8) +
-  geom_text(aes(label=paste0(Site)),hjust=-0.2, vjust=0.2) +
-  annotate("text", label = lb2, x = 2, y = 8.5, size = 4, colour = "black", parse=T) +
-  annotate("text", label = paste0("RMSE = ", rmse), x = 2, y = 7.4, size = 4, colour = "black") +
-  ylim(0,10) + xlim(0,10) +
-  theme_minimal()
-
+  test[[1]][7] 
+  
