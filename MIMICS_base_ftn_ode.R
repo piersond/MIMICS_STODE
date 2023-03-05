@@ -181,7 +181,7 @@ MIMICS1 <- function(df, solver="ODE", step=10000, end=1e7) {
   if(solver == "STODE") {
   
     # ------------RUN THE MODEL-------------
-    test  <- stode(y = Ty, time = 1e6, fun = RXEQ, parms = Tpars, positive = TRUE)
+    test  <- stode(y = Ty, time = end, fun = RXEQ, parms = Tpars, positive = TRUE)
     
     # ### Calc and get MIMICS output 
     MIMLIT    <- (test[[1]][[1]]+test[[1]][[2]])  * depth *1e4 / 1e6 #convert kgC/m2 from mgC/cm3 (0-30 cm)
@@ -190,13 +190,14 @@ MIMICS1 <- function(df, solver="ODE", step=10000, end=1e7) {
     MIMSOC    <- sum(test[[1]])  * depth *1e4 / 1e6
   
     table <- as.numeric(test[[1]])
+    table2 <- as.numeric(test[[2]])
   
     MIMout <- data.frame(Site = df$Site,
                          fCLAY = fCLAY,
                          TSOI = TSOI,
                          ANPP = ANPP,
                          LIGN = lig_N,
-                         EST_LIT = EST_LIT,
+                         EST_LIT = EST_LIT *1e4 / 1e6,
                          MIMSOC = MIMSOC,
                          MIMMIC = MIMMIC,
                          MIMLIT = MIMLIT,
@@ -210,28 +211,33 @@ MIMICS1 <- function(df, solver="ODE", step=10000, end=1e7) {
                          SOMp = table[5] * depth *1e4 / 1e6,
                          SOMc = table[6] * depth *1e4 / 1e6,
                          SOMa = table[7] * depth *1e4 / 1e6,
-                         #CO2r = table[8] * depth *1e4 / 1e6,
-                         #CO2r = table[9] * depth *1e4 / 1e6,
+                         CO2r = table2[1] * depth *1e4 / 1e6,
+                         CO2K = table2[2] * depth *1e4 / 1e6,
                          DEBUG = note)
     return(MIMout)
   }
   
   if(solver == "ODE") {
+    
+    time_steps = seq(1,end,step)
+    n_steps = length(time_steps)
+    
     t_sol_ss = ode(
       y = Ty,
-      times = c(seq(1,end,step)),
+      times = time_steps,
       func = RXEQ,
       parms = c(), 
       method = "ode45")
   
     sol = as.data.frame(t_sol_ss)
+    colnames(sol) = c("time", "LITm", "LITs", "MICr", "MICK", "SOMp", "SOMc", "SOMa", "CO2r", "CO2K")
     
-    forcing = data.frame(Site = rep(df$Site, end),
-                          fCLAY = rep(fCLAY, end),
-                          TSOI = rep(TSOI, end),
-                          ANPP = rep(ANPP, end),
-                          LIGN = rep(lig_N, end),
-                          EST_LIT = rep(EST_LIT, end))
+    forcing = data.frame(Site = rep(df$Site,  n_steps ),
+                          fCLAY = rep(fCLAY,  n_steps ),
+                          TSOI = rep(TSOI,  n_steps ),
+                          ANPP = rep(ANPP,  n_steps ),
+                          LIGN = rep(lig_N,  n_steps ),
+                          EST_LIT = rep(EST_LIT *1e4 / 1e6,  n_steps ))
     
     # Convert units, * depth *1e4 / 1e6
     for(i in 2:ncol(sol)) {
@@ -258,5 +264,24 @@ MIMICS1 <- function(df, solver="ODE", step=10000, end=1e7) {
 data <- read.csv("LTER_SITE_1.csv", as.is=T)
 df = data[5,]
 
-MIMout_single <- MIMICS1(df, solver="STODE", step=100000, end=1e7)
-MIMout_spinup <- MIMICS1(df, solver="ODE", step=100000, end=1e7)
+# Single site run
+MIMout_single <- MIMICS1(df, solver="STODE", step=10000, end=1e7)
+MIMout_spinup <- MIMICS1(df, solver="ODE", step=10000, end=1e7)
+
+# Dataset run
+MIMout <- data %>% split(1:nrow(data)) %>% map(~ MIMICS1(df=., solver="ODE", step=10000, end=1e7)) %>% bind_rows()
+
+#######################################
+# Example plot
+#######################################
+p <- ggplot(MIMout, aes(x=time, y=MIMSOC, color=Site)) + geom_line(size=1) +
+  xlab("Time step") +
+  ggtitle("MIMICS ODE spin up for LTER sites") +
+  theme_minimal()
+p
+
+# Save plot
+#png(file = "MIMSOC-spinup.png", height = 500, width=1000)
+#p
+#dev.off()
+
