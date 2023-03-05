@@ -1,3 +1,3 @@
 # MIMICS_STODE CN
 
-Under construction
+Functional, but still under construction
