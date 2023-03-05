@@ -8,6 +8,7 @@ library(dplyr)
 library(purrr)
 library(ggplot2)
 library(Metrics)
+library(deSolve)
 
 #bring in RXEQ function
 source("CN_RXEQ.R")
@@ -127,14 +128,14 @@ SOMmin  <- rep(NA, dim=2)
 DEsorb  <- rep(NA, dim=1)
 OXIDAT  <- rep(NA, dim=1)
 
-LIT_1_N  <<- .1
-LIT_2_N  <<- .1
-MIC_1_N  <<- .1
-MIC_2_N  <<- .1
-SOM_1_N  <<- .1
-SOM_2_N  <<- .1
-SOM_3_N  <<- .1
-DIN      <<- .1
+LIT_1_N  <<- 1e-4
+LIT_2_N  <<- 1e-4
+MIC_1_N  <<- 1e-4
+MIC_2_N  <<- 1e-4
+SOM_1_N  <<- 1e-4
+SOM_2_N  <<- 1e-4
+SOM_3_N  <<- 1e-4
+DIN      <<- 1e-4
 
 LITminN   <<- array(NA, dim=4)
 MICtrnN   <<- array(NA, dim=6)
@@ -171,11 +172,7 @@ Ty    <<- c(LIT_1 = lit[1], LIT_2 = lit[2],
             SOM_1_N = SOM_1_N, SOM_2_N = SOM_2_N, SOM_3_N = SOM_3_N,
             DIN = DIN)
 
-test  <<- stode(y = Ty, time = 1e6, fun = CN_RXEQ, parms = Tpars, positive = TRUE)
-
-# C only version results:
-# LIT_1       LIT_2       MIC_1       MIC_2       SOM_1       SOM_2       SOM_3 
-# 1.656909890 4.669793042 0.025965813 0.004162176 0.772933300 3.266147911 3.854644406 
+test  <<- stode(y = Ty, time = 1e7, fun = CN_RXEQ, parms = Tpars, positive = TRUE)
 
 ### Calc and get MIMICS output 
 MIMLIT    <- (test[[1]][[1]]+test[[1]][[2]])  * depth *1e4 / 1e6 #convert kgC/m2 from mgC/cm3 (0-30 cm) 
@@ -183,9 +180,31 @@ MIMMIC    <- (test[[1]][[3]]+test[[1]][[4]])  * depth *1e4 / 1e6
 MIM_CO    <-  test[[1]][[3]]/test[[1]][[4]]
 MIMSOC    <- sum(test[[1]])  * depth *1e4 / 1e6   
 
+# C only version results:
+# LIT_1       LIT_2       MIC_1       MIC_2       SOM_1       SOM_2       SOM_3 
+# 1.656909890 4.669793042 0.025965813 0.004162176 0.772933300 3.266147911 3.854644406 
+
 test[[1]]
 attributes(test)
-print(MIMLIT)
-print(MIMMIC)
-print(MIMSOC)
-print(df$SOC)
+
+end = 3e6
+step = 1e2
+time_steps = seq(1,end,step)
+n_steps = length(time_steps)
+
+start_time <- Sys.time()
+
+t_sol_ss = ode(
+  y = Ty,
+  times = time_steps,
+  func = CN_RXEQ,
+  parms = c(),
+  method = "ode45",
+  maxsteps = 1000000)
+
+print(paste0("Task time: ", Sys.time() - start_time))
+gc()
+
+sol <- as.data.frame(t_sol_ss)
+
+ggplot(sol, aes(x=time, y=SOM_1)) + geom_point() + geom_line()
