@@ -1,40 +1,8 @@
 ## Set working drive
-#setwd("C:/github/MIMICS_HiRes")
+setwd("C:/github/MIMICS_STODE")
 
 # Bring in MIMICS ftn
-source("MIMICS_ftns/MIMICS_base_ftn.R")
-
-###################################################
-# Set MIMICS initial parameters (default values)
-###################################################
-Vslope  <- rep(0.063, 6)
-Vint    <- rep(5.47, 6)
-aV      <- rep(0.000008, 6)  
-Kslope  <- rep(c(0.025, 0.035, 0.025),2)
-Kint    <- rep(3.19, 6)
-aK      <- rep(10, 6)
-vMOD    <- c(10, 2, 10, 3, 3, 2)
-kMOD    <- c(8, 2, 4, 2, 4, 6)
-KO      <- c(6, 6)
-CUE     <- c(0.55, 0.25, 0.75, 0.35)
-CUE_MULT <- 1
-tau_r   <- c(0.00052, 0.3)
-tau_K   <- c(0.00024, 0.1)
-Tau_MOD <- c(100, 0.8, 1.2, 2)
-Tau_MULT <- 1
-fPHYS_r <- c(0.3, 1.3)
-fPHYS_K <- c(0.2, 0.8)
-fPHYS_MULT <- 1
-fCHEM_r <- c(0.1, -3, 1)
-fCHEM_K <- c(0.3, -3, 1)
-fSOM_p  <- c(0.000015, -1.5)
-PHYS_scalar <- c(2, -2)
-desorb_MULT <- 1
-FI      <- c(0.05, 0.05)
-fmet_p <- c(1, 0.85, 0.013)
-depth <- 30
-h2y        <- 24*365
-MICROtoECO <- depth * 1e4 * 1e-3         # mgC/cm3 to g/m2
+source("MIM_ftns/MIMICS_base_ftn.R")
 
 # Store default parameters for brute force reference
 Vslope_default <- rep(0.063, 6)
@@ -48,13 +16,6 @@ desorb_MULT_default <- 1
 fPHYS_MULT_default <- 1
 
 
-########################################
-# Set fMET equation
-########################################
-#fMET_calc  <- fmet_p[1] * (fmet_p[2] - fmet_p[3] * data$lig_N)   
-#fMET       <- fMET_calc  
-
-
 ###########################################
 # MIMICS repeat run function
 ###########################################
@@ -62,14 +23,14 @@ fPHYS_MULT_default <- 1
 MIMrepeat <- function(forcing_df, rparams, output_type = "summary") {
   
   # Set global model parameters
-  .GlobalEnv$Vslope = Vslope_default * rparams$Vslope_x[1]
-  .GlobalEnv$Vint = Vint_default * rparams$Vint_x[1]
-  .GlobalEnv$Kslope = Kslope_default * rparams$Kslope_x[1]
-  .GlobalEnv$Kint = Kint_default * rparams$Kint_x[1]
-  .GlobalEnv$Tau_MULT = Tau_MULT_default * rparams$Tau_x[1]
-  .GlobalEnv$CUE = CUE_default * rparams$CUE_x[1]
-  .GlobalEnv$desorb_MULT = desorb_MULT_default * rparams$desorb_x[1]
-  .GlobalEnv$fPHYS_MULT = fPHYS_MULT_default * rparams$fPHYS_x[1]
+  Vslope <<- Vslope_default * rparams$Vslope_x[1]
+  Vint <<- Vint_default * rparams$Vint_x[1]
+  Kslope <<- Kslope_default * rparams$Kslope_x[1]
+  Kint <<- Kint_default * rparams$Kint_x[1]
+  Tau_MULT <<- Tau_MULT_default * rparams$Tau_x[1]
+  CUE <<- CUE_default * rparams$CUE_x[1]
+  desorb_MULT <<- desorb_MULT_default * rparams$desorb_x[1]
+  fPHYS_MULT <<- fPHYS_MULT_default * rparams$fPHYS_x[1]
   
   #full run of forcing data csv
   MIMrun <- forcing_df %>% split(1:nrow(forcing_df)) %>% map(MIMICS1) %>% bind_rows() 
@@ -226,28 +187,24 @@ MIMrepeat <- function(forcing_df, rparams, output_type = "summary") {
   } else {
     print("Set function parameter 'output_type' to either 'summary' or 'all'")
   }
-  
-  
-  
-  
 }
 
 #####################
 # Example use
 #####################
 
-# bring in forcing data
-data <- read.csv("RCrk_Modelling_Data/RCrk_SOC_calibration.csv", as.is=T)
-
-test_params <- data.frame(Vslope_x = 1.5382,
-                          Vint_x = 1.8601,
-                          Kslope_x = 0.8204,
-                          Kint_x = 1.7086,
-                          Tau_x = 0.8446,
-                          CUE_x = 0.9113,
-                          desorb_x = 1.7790,
-                          fPHYS_x = 0.9690,
-                          run_num = 1)
-
-test_output_summary <- MIMrepeat(forcing_df = data, rparams = test_params, output_type = "summary")
-test_output_all <- MIMrepeat(forcing_df = data, rparams = test_params, output_type = "all")
+# # bring in forcing data
+# data <- read.csv("Data/LTER_SITE_1.csv", as.is=T)
+# 
+# test_params <- data.frame(Vslope_x = 1.5382,
+#                           Vint_x = 1.8601,
+#                           Kslope_x = 0.8204,
+#                           Kint_x = 1.7086,
+#                           Tau_x = 0.8446,
+#                           CUE_x = 0.9113,
+#                           desorb_x = 1.7790,
+#                           fPHYS_x = 0.9690,
+#                           run_num = 1)
+# 
+# test_output_summary <- MIMrepeat(forcing_df = data, rparams = test_params, output_type = "summary")
+# test_output_all <- MIMrepeat(forcing_df = data, rparams = test_params, output_type = "all")

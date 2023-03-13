@@ -1,3 +1,5 @@
 # MIMICS model: Monte Carlo (MC) Parameterization
 
-NOT WORKING YET - 3/13/2023
+LTER Example works locally - 3/13/2023
+
+Next step, load up and test job on Cheyenne

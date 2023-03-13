@@ -1,0 +1,25 @@
+#!/bin/bash -l
+#PBS -N batch_MIMICS
+#PBS -A P93300641
+#PBS -l walltime=1:00:00
+#PBS -q regular
+#PBS -j oe
+#PBS -m abe
+#PBS -M derek.pierson@usda.gov
+#PBS -l select=1:ncpus=32:ompthreads=32
+
+### Intialize the PBS environment
+
+export TMPDIR=/glade/scratch/$USER/temp
+mkdir -p $TMPDIR
+
+### Load modules required to run the job
+date
+module purge
+module reset
+module load R/4.1.2
+module li
+
+### Run program
+Rscript Cheyenne_HPC/MSBio_MC_run.R
+
