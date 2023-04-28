@@ -187,24 +187,73 @@ MIMSOC    <- sum(test[[1]])  * depth *1e4 / 1e6
 test[[1]]
 attributes(test)
 
-end = 3e6
-step = 1e2
-time_steps = seq(1,end,step)
-n_steps = length(time_steps)
 
-start_time <- Sys.time()
+##############################
+# ODE SOLVER
+##############################
+ 
+# end = 3e6
+# step = 1e2
+# time_steps = seq(1,end,step)
+# n_steps = length(time_steps)
+# 
+# start_time <- Sys.time()
+# 
+# t_sol_ss = ode(
+#   y = Ty,
+#   times = time_steps,
+#   func = CN_RXEQ,
+#   parms = c(),
+#   method = "ode45",
+#   maxsteps = 1000000)
+# 
+# print(paste0("Task time: ", Sys.time() - start_time))
+# gc()
+# 
+# sol <- as.data.frame(t_sol_ss)
+# 
+# ggplot(sol, aes(x=time, y=SOM_1)) + geom_point() + geom_line()
 
-t_sol_ss = ode(
-  y = Ty,
-  times = time_steps,
-  func = CN_RXEQ,
-  parms = c(),
-  method = "ode45",
-  maxsteps = 1000000)
 
-print(paste0("Task time: ", Sys.time() - start_time))
-gc()
+########################################
+# SS forward
+#######################################
+source("calc_Tpars.R")
 
-sol <- as.data.frame(t_sol_ss)
+# Grab steady state pools from stode output above
+ss = test[[1]]
 
-ggplot(sol, aes(x=time, y=SOM_1)) + geom_point() + geom_line()
+# Create dataframe to store MIMICS pools over timesteps
+ # Init first row = steady state
+MIMfwd = t(as.data.frame(ss)) 
+
+# Set number of days to sim forward
+sim_days = 365*2
+
+# Hourly modle loop
+for(i in 2:(sim_days*24)){ # interval = hour
+  #print(i) #progress tracker
+  
+  # Recalc Tpars here, calls ftn in calc_Tpars.R
+  #---------------------------------------------
+  # e.g. 1 C warming over simulation period
+  total_warming <- 1
+  hr_warming <- total_warming/(sim_days*24) 
+  TSOI_adj = -7+(hr_warming*(i-1))
+  Tpars_mod = calc_Tpars(TSOI = TSOI_adj, ANPP = 141, CLAY = 5, CN =36.49635, LIG = 16.6) #>> Same example site input as used for stode
+  
+  # Update MIMICS pools
+  #---------------------------------------------
+  step = CN_RXEQ(t=NA, y=MIMfwd[i-1,], pars=Tpars_mod)
+  pools_update = MIMfwd[i-1,] + unlist(step)
+  MIMfwd = rbind(MIMfwd, t(as.data.frame(pools_update)))
+}
+
+# Steady state forward hourly data
+ss_forward_output = as.data.frame(MIMfwd)
+
+# example pool change over simulation period
+ggplot(ss_forward_output, aes(y=SOM_3_N, x=1:(sim_days*24)/24)) + geom_point() +
+  xlab("Days") +
+  theme_bw()
+

@@ -1,6 +1,9 @@
 # MIMICS-CN Rev-MM Eq.
 
 CN_RXEQ <- function(t, y, pars) {
+  
+  #print(pars['VMAX1'])
+  
   with (as.list(c(y, pars)),{
     
     LITmin[1] = MIC_1 * VMAX[1] * LIT_1 / (KM[1] + MIC_1)
