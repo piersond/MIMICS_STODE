@@ -80,7 +80,7 @@ calc_Tpars <- function(TSOI, ANPP, CLAY, CN, LIG) {
   upMIC_2   <<-  array(NA, dim=1)
   upMIC_2_N <<-  array(NA, dim=1)
   
-  Tpars <- c( Inputs = I, VMAX = VMAX, KM = KM, CUE = CUE, 
+  Tpars <- list(Inputs = I, VMAX = VMAX, KM = KM, CUE = CUE, 
                fPHYS = fPHYS, fCHEM = fCHEM, fAVAI = fAVAI, FI = FI, 
                tau = tau, LITmin = LITmin, SOMmin = SOMmin, MICtrn = MICtrn, 
                desorb = desorb, DEsorb = DEsorb, OXIDAT = OXIDAT, KO = KO,
@@ -99,5 +99,7 @@ calc_Tpars <- function(TSOI, ANPP, CLAY, CN, LIG) {
 t1 = calc_Tpars(TSOI = 7, ANPP = 500, CLAY = 40, CN =20, LIG = 15)
 t2 = calc_Tpars(TSOI = 8, ANPP = 500, CLAY = 40, CN =20, LIG = 15)
 
-t1['VMAX1']
-t2['VMAX1']
+str(t1)
+
+t1['VMAX']
+t2['VMAX']

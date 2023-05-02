@@ -230,14 +230,14 @@ MIMfwd = t(as.data.frame(ss))
 # Set number of days to sim forward
 sim_days = 365*2
 
-# Hourly modle loop
+# Hourly model loop
 for(i in 2:(sim_days*24)){ # interval = hour
   #print(i) #progress tracker
   
   # Recalc Tpars here, calls ftn in calc_Tpars.R
   #---------------------------------------------
   # e.g. 1 C warming over simulation period
-  total_warming <- 1
+  total_warming <- 0
   hr_warming <- total_warming/(sim_days*24) 
   TSOI_adj = -7+(hr_warming*(i-1))
   Tpars_mod = calc_Tpars(TSOI = TSOI_adj, ANPP = 141, CLAY = 5, CN =36.49635, LIG = 16.6) #>> Same example site input as used for stode
