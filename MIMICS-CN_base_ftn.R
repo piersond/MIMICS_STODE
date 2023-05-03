@@ -10,7 +10,7 @@ library(ggplot2)
 library(Metrics)
 library(deSolve)
 
-#bring in RXEQ function
+# Bring in RXEQ function
 source("CN_RXEQ.R")
 #source("C:/github/MIMICS_HiRes/MIMICS_ftns/RXEQ_ftn.R")
 
