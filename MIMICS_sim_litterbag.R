@@ -11,13 +11,13 @@ library(Metrics)
 library(DT)
 
 # Bring in RXEQ function
-source("RXEQ_ftn.R")
+source("RXEQ/RXEQ_ftn.R")
 
 # Bring in MIMICS steady state ftn
 source("MIMICS_steady_state_pools.R")
 
 # Set MIMICS parameters via R script
-source("MIMICS_parameters.R")
+source("Parameters/MIMICS_parameters_sandbox_20231129.R")
 
 ###############################
 # Litter bag simulation ftn
@@ -124,11 +124,13 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, lita
       LIT_1 = LIT_1 + I[1]*(1-FI[1]) - LITmin[1] - LITmin[3]
       LITbag_1 <- LITbag_1 - LITbag[1] - LITbag[3] #+ I[1]*(1-FI[1])
       MIC_1 = MIC_1 + CUE[1]*(LITmin[1]+ SOMmin[1]) + CUE[2]*(LITmin[2]) - sum(MICtrn[1:3])
+      #MICbag_1
       SOM_1 = SOM_1 + I[1]*FI[1] + MICtrn[1] + MICtrn[4]- DEsorb 
       
       LIT_2 = LIT_2 + I[2] * (1-FI[2]) - LITmin[2] - LITmin[4]
       LITbag_2 <- LITbag_2 - LITbag[2] - LITbag[4] #+ I[2] * (1-FI[2])
       MIC_2 = MIC_2 + CUE[3]*(LITmin[3]+ SOMmin[2]) + CUE[4]*(LITmin[4]) - sum(MICtrn[4:6])  
+      #MICbag_2
       SOM_2 = SOM_2 + I[2]*FI[2] + MICtrn[2] + MICtrn[5] - OXIDAT
       
       SOM_3 = SOM_3 + MICtrn[3] + MICtrn[6] + DEsorb + OXIDAT - SOMmin[1] - SOMmin[2]	#add litter bag on Oct 1
@@ -172,9 +174,9 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, lita
   #return(list(LIT, LITBAG, MIC, SOM))
   
   LITBAG_out <- rbind(as.data.frame(LITBAG), 
-                     as.data.frame(LIT), 
-                     as.data.frame(MIC),
-                     as.data.frame(SOM))
+                      as.data.frame(LIT), 
+                      as.data.frame(MIC),
+                      as.data.frame(SOM))
   
   LITBAG_out <- LITBAG_out * depth *1e4 / 1e6 
   LITBAG_out <- as.data.frame(t(LITBAG_out))
@@ -196,7 +198,7 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, lita
 #--------------------------------------
 
 # Forcing data for LTER sites
-LTER <- read.csv("LTER_SITE_1.csv", as.is=T)
+LTER <- read.csv("Data/LTER_SITE_1.csv", as.is=T)
 
 # LiDET litter bags
 LiDET_BAGS <- data.frame(TYPE = c('TRAEf', 'PIREf','THPLf','ACSAf','QUPRf','DRGLf'),
@@ -209,19 +211,42 @@ LiDET_BAGS$CALC_MET <- 0.85 - 0.013 * LiDET_BAGS$BAG_LIG/LiDET_BAGS$CALC_N
 
 BAG_init_size <- 100
 BAGS <- LiDET_BAGS %>% select(TYPE, CALC_MET)
-BAGS$BAG_LITm <- ((BAG_init_size * 1e3 / 1e4)/ depth) * BAGS$CALC_MET  
-BAGS$BAG_LITs <- ((BAG_init_size * 1e3 / 1e4)/ depth) * (1-BAGS$CALC_MET)  
+BAGS$BAG_LITm <- BAG_init_size * BAGS$CALC_MET  
+BAGS$BAG_LITs <- BAG_init_size * (1-BAGS$CALC_MET)  
 
 
 #---------------------------------------------
 # Example: Run single litter bag decomp simulation
 #---------------------------------------------
 
-FORCING_input <- LTER[6,] 
-BAG_input <- BAGS[1,]
+# Use an LTER site
+#forcing_input <- LTER[6,]
 
-BAG_out <- MIMICS_LITBAG(FORCING_input, BAG_input, nspin_yrs=10, nspin_days=150, litadd_day=125, verbose=T)
-  
+# Build your own example
+forcing_input <- data.frame(Site = "TEST SITE",
+                            ANPP = 744,
+                            TSOI = 15,
+                            MAT = 25,
+                            CLAY = 15,
+                            LIG = 21,
+                            N = 1.02,
+                            CN = 49,
+                            lig_N = 20.588,
+                            grav.moisture = 35)
+
+# Select a litter type from the LiDET example litter bags
+BAG_input <- BAGS[6,]
+
+# Run litterbag decomp simulation
+BAG_out <- MIMICS_LITBAG(forcing_input, BAG_input, nspin_yrs=10, nspin_days=150, litadd_day=125, verbose=T)
+
+# Calc MIMICS C pools
+BAG_out$MIMSOC <- rowSums(BAG_out[,6:12])
+BAG_out$MIMMIC <- rowSums(BAG_out[,8:9])  
+BAG_out$MIMLIT <- rowSums(BAG_out[,6:7])  
+BAG_out$MICtoSOC <- BAG_out$MIMMIC/BAG_out$MIMSOC
+
+# Plot litterbag decomp over time
 ggplot(BAG_out) + 
   geom_line(aes(y=LITBAGm, x=DAY, colour="LITm"), linewidth=1, linetype="dashed") +
   geom_line(aes(y=LITBAGs, x=DAY, colour="LITs"), linewidth=1, linetype="dashed") +
@@ -230,7 +255,7 @@ ggplot(BAG_out) +
   ylab("Litter Bag C") +
   xlab("Day") +
   labs(title = "MIMICS Litter Bag Simulation",
-       subtitle = paste0("Site: ", FORCING_input$Site, "\nLitter type: ", BAG_input[1]),
+       subtitle = paste0("Site: ", forcing_input$Site, "\nLitter type: ", BAG_input[1]),
        colour = "LIT Pool") +
   theme_bw()
 
@@ -239,16 +264,16 @@ ggplot(BAG_out) +
 # Example: Run multiple litter bags thru decomp simulation
 #---------------------------------------------
 
-BAGS_out <- BAGS %>% split(1:nrow(BAGS)) %>% map(~ MIMICS_LITBAG(litBAG=., 
-                                                                 forcing_df=LTER[6,],
-                                                                 nspin_yrs=20, 
-                                                                 nspin_days=0, 
-                                                                 litadd_day=100, 
-                                                                 verbose=T)) %>% bind_rows()
-ggplot() + 
-  geom_line(data=BAGS_out, aes(y=LITBAGs+LITBAGm, x=DAY, color=Litter_Type), linewidth=1, alpha=0.5) +
-  ylab("Litter Bag C") +
-  xlab("Day") +
-  labs(color="LiDET\nLitter Type") +
-  ggtitle("MIMICS Litter Bag Simulation") +
-  theme_bw()
+# BAGS_out <- BAGS %>% split(1:nrow(BAGS)) %>% map(~ MIMICS_LITBAG(litBAG=., 
+#                                                                  forcing_df=LTER[6,],
+#                                                                  nspin_yrs=20, 
+#                                                                  nspin_days=0, 
+#                                                                  litadd_day=100, 
+#                                                                  verbose=T)) %>% bind_rows()
+# ggplot() + 
+#   geom_line(data=BAGS_out, aes(y=LITBAGs+LITBAGm, x=DAY, color=Litter_Type), linewidth=1, alpha=0.5) +
+#   ylab("Litter Bag C") +
+#   xlab("Day") +
+#   labs(color="LiDET\nLitter Type") +
+#   ggtitle("MIMICS Litter Bag Simulation") +
+#   theme_bw()

@@ -11,10 +11,10 @@ library(Metrics)
 library(DT)
 
 # Bring in RXEQ function
-source("RXEQ_ftn.R")
+source("RXEQ/RXEQ_ftn.R")
 
 # Set MIMICS parameters via R script
-source("MIMICS_parameters.R")
+source("Parameters/MIMICS_parameters_sandbox_20231129.R")
 
 ###############################################
 # MIMICS single point function
@@ -24,6 +24,9 @@ MIMICS_SS <- function(df){
   
   #DEBUG
   #df = LTER[1,]
+  
+  # Convert column names to upper case
+  colnames(df) <- toupper(colnames(df))
   
   ### Setup a var to collect run notes
   note <- ""
@@ -38,28 +41,62 @@ MIMICS_SS <- function(df){
   TSOI <- df$TSOI
   
   ### Bring in lig:N forcing data
-  lig_N <- df$lig_N
+  LIG_N <- df$LIG_N
+  
+  ### Bring in mean annual temperature data
+  MAT <- df$MAT  
+  
+  # Use TSOI if 'MAT' column is not in forcing data
+  if(is.null(MAT)){
+    MAT <- TSOI
+  }
   
   ###########################################################
   ### Set fMET equation
   ###########################################################
-  ## Option A: Defualt fMET equation using lig:N values
-  fMET <- fmet_p[1] * (fmet_p[2] - fmet_p[3] * lig_N) 
+  ## Defualt fMET equation using lig:N values
+  fMET <- fmet_p[1] * (fmet_p[2] - fmet_p[3] * LIG_N) 
   
-  ## Option B: LTER ~fMET value (average from LiDET)
+  ## MIMICS et al 2015 = LTER ~fMET values equal average from LiDET study
   #fMET <- 0.3846423
   
-  ##########################################################
-  # CORPSE IMPLEMENTATION OF MOISTURE CONTROL
-  ##########################################################
-  theta_liq  <- df$grav_moisture/100
-  theta_frzn = 0
-  air_filled_porosity = max(0.0, 1.0-theta_liq-theta_frzn)
-  fW = (theta_liq^3 * air_filled_porosity^2.5)/0.022600567942709
-  fW = max(0.05, fW)
   
-  # Turn off moisture control (comment out to turn on)
-  fW = 1 
+  ##########################################################
+  ### CHOOSE SOIL MOISTURE CONTROL IMPLEMENTATION
+  ##########################################################
+  
+  # Option 1 = CORPSE
+  # Option 2 = Pierson-CORPSE
+  # Option 3 = OFF (i.e., no soil moisture control on decomposition)
+  
+  moisture_option = 2
+  
+  #------------------------------------------------------------------
+  
+  if(moisture_option == 1) {
+    # CORPSE IMPLEMENTATION OF MOISTURE CONTROL
+    ##########################################################
+    theta_liq  <- df$grav_moisture/100
+    theta_frzn = 0
+    air_filled_porosity = max(0.0, 1.0-theta_liq-theta_frzn)
+    fW = (theta_liq^3 * air_filled_porosity^2.5)/0.022600567942709
+    fW = max(0.05, fW)
+  } else if(moisture_option == 2) {
+    # PIERSON-CORPSE IMPLEMENTATION OF MOISTURE CONTROL
+    #----------------------------------------------------------------------------------------------------
+    theta_liq  <- df$grav.moisture/100 
+    theta_frzn = 0
+    air_filled_porosity = max(0.0, 1.0-theta_liq-theta_frzn)
+    
+    f <- function(x, p1, p2) {x^p1 * (1-x)^p2}
+    fW_p3 <- optimize(f, interval=c(0.01,1), p1=fW_p1, p2=fW_p2, maximum = T)$objective
+    
+    fW = (theta_liq^fW_p1 * air_filled_porosity^fW_p2)/fW_p3
+    fW = max(0.05, fW) 
+  } else {
+    # Turn off moisture control (comment out to turn on)
+    fW = 1 
+  }
   
   ############################################################
   # MIMICS MODEL CODE STARTS HERE
@@ -67,6 +104,12 @@ MIMICS_SS <- function(df){
   
   # Calc litter input rate
   EST_LIT <- (ANPP / (365*24)) * 1e3 / 1e4
+  
+  # ------------ MSBio MAT sensitive Vmax -----------
+     #--> Historically 'cold' site decomp ~11.5% faster at 15 C
+     #--> Historically 'warm' site decomp ~5% faster at 25 C
+  Vslope = Vslope + (MAT*0.00104) 
+  Vint = Vint - (MAT*0.0228) 
   
   # ------------ caclulate parameters ---------------
   Vmax     <- exp(TSOI * Vslope + Vint) * aV * fW   #<--------------- Moisture scalar applied.
@@ -197,59 +240,68 @@ MIMICS_SS_format <- function(MIMICS_SS_output) {
   return(MIMout_single_tbl)
 }
 
-# 
-# #------------------------------------------------------------------------------
-# #--- EXAMPLE USE ---
-# #------------------------------------------------------------------------------
-# 
-# #-------------------------------------------------------
-# # Load LTER forcing dataset for example simulations
-# #-------------------------------------------------------
-# 
-# # Forcing data for LTER sites
-# LTER <- read.csv("LTER_SITE_1.csv", as.is=T)
-# 
-# 
-# #---------------------------------------------------------------------------
-# # Example: Find steady state pools for a single site
-# #---------------------------------------------------------------------------
-# 
-# # Get MIMICS steady state (SS) pools for a single site in the LTER forcing dataset
-# MIMout_single_raw <- MIMICS_SS(LTER[1,])
-# MIMICS_ss_tbl <- MIMICS_SS_format(MIMout_single_raw)
-# 
-# # View table
-# datatable(MIMICS_ss_tbl %>% mutate_if(is.numeric, round, digits=3))
-#  
-# #---------------------------------------------------------------------------
-# # Example: Find steady state pools for a forcing dataset
-# #---------------------------------------------------------------------------
-# 
-# MIMruns <- LTER %>% split(1:nrow(LTER)) %>% map(~ MIMICS_SS(df=.))
-# MIMruns_format <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
-# MIMICS_ss_dataset <- LTER[,1:2] %>% cbind(MIMruns_format %>% select(-Site, -SOC))  # Bind data info columns to MIMICS output
-# 
-# # View table
-# datatable(MIMICS_ss_dataset %>% mutate_if(is.numeric, round, digits=3))
-# 
-# 
-# # Plot field vs MIMICS SOC
-# #---------------------------------
-# plot_data <- MIMICS_ss_dataset 
-# 
-# # Calc SOC vs. MIMSOC r2 and RMSE
-# r2_test <- cor.test(plot_data$SOC, plot_data$MIMSOC)
-# r_val <- round(as.numeric(unlist(r2_test ['estimate'])),2)
-# lb2 <- paste("R^2 == ", r_val)
-# 
-# rmse <- round(rmse(plot_data$SOC, plot_data$MIMSOC),2)
-# 
-# # Plot SOC vs. MIMSOC
-# ggplot(plot_data, aes(x=MIMSOC, y=SOC, color=TSOI)) +
-#   geom_abline(intercept = 0, slope = 1, linetype = "dashed")+
-#   geom_point(size=4, alpha=0.8) +
-#   geom_text(aes(label=paste0(Site)),hjust=-0.2, vjust=0.2) +
-#   annotate("text", label = lb2, x = 2, y = 8.5, size = 4, colour = "black", parse=T) +
-#   annotate("text", label = paste0("RMSE = ", rmse), x = 2, y = 7.4, size = 4, colour = "black") +
-#   ylim(0,10) + xlim(0,10) +
+
+#------------------------------------------------------------------------------
+#--- EXAMPLE USE ---
+#------------------------------------------------------------------------------
+
+#-------------------------------------------------------
+# Load LTER forcing dataset for example simulations
+#-------------------------------------------------------
+
+# Forcing data for LTER sites
+LTER <- read.csv("Data/LTER_SITE_1.csv", as.is=T)
+
+
+#---------------------------------------------------------------------------
+# Example: Find steady state pools for a single site
+#---------------------------------------------------------------------------
+
+# Get MIMICS steady state (SS) pools for a single site in the LTER forcing dataset
+MIMout_single_raw <- MIMICS_SS(LTER[1,])
+MIMICS_ss_tbl <- MIMICS_SS_format(MIMout_single_raw)
+
+# View table
+datatable(MIMICS_ss_tbl %>% mutate_if(is.numeric, round, digits=3))
+
+#---------------------------------------------------------------------------
+# Example: Find steady state pools for a forcing dataset
+#---------------------------------------------------------------------------
+
+MIMruns <- LTER %>% split(1:nrow(LTER)) %>% map(~ MIMICS_SS(df=.))
+MIMruns_format <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
+MIMICS_ss_dataset <- LTER[,1:2] %>% cbind(MIMruns_format %>% select(-SITE, -SOC))  # Bind data info columns to MIMICS output
+
+# View table
+datatable(MIMICS_ss_dataset %>% mutate_if(is.numeric, round, digits=3))
+
+
+# Plot field vs MIMICS SOC
+#---------------------------------
+plot_data <- MIMICS_ss_dataset
+
+# Calc SOC vs. MIMSOC r2 and RMSE
+r2_test <- cor.test(plot_data$SOC, plot_data$MIMSOC)
+r_val <- round(as.numeric(unlist(r2_test ['estimate'])),2)
+lb2 <- paste("R^2 == ", r_val)
+
+rmse <- round(rmse(plot_data$SOC, plot_data$MIMSOC),2)
+
+# Plot SOC vs. MIMSOC
+ggplot(plot_data, aes(x=MIMSOC, y=SOC, color=TSOI)) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed")+
+  geom_point(size=4, alpha=0.8) +
+  geom_text(aes(label=paste0(Site)),hjust=-0.2, vjust=0.2) +
+  annotate("text", label = lb2, x = 2, y = 8.5, size = 4, colour = "black", parse=T) +
+  annotate("text", label = paste0("RMSE = ", rmse), x = 2, y = 7.4, size = 4, colour = "black") +
+  ylim(0,10) + xlim(0,10) +
+  theme_minimal()
+
+# Check against sandbox
+# Run the sandbox MIMICS script, then run...
+# plot_data$Wieder_2015_MIMSOC <- MIMSOC
+# ggplot(plot_data, aes(x=MIMSOC, y=Wieder_2015_MIMSOC)) + geom_point(size=3) +
+#   geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
+#   xlab("Pierson_STODE\nMIMSOC") +
+#   ylab("Wieder et al. 2015 - Sandbox\nMIMSOC") +
 #   theme_minimal()

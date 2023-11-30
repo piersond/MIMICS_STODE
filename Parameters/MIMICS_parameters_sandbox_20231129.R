@@ -28,7 +28,13 @@ depth <- 30 # set soil depth
 h2y        <- 24*365
 MICROtoECO <- depth * 1e4 * 1e-3  # mgC/cm3 to g/m2
 
+# fW coeeficient for Pierson-CORPSE moisture control
+fW_p1 <- 1.212580 #* 0.6867031  # MSBio new
+fW_p2 <- 2.748028 #* 0.6300376  # MSBio new
+
 #Set default multipliers
 Tau_MULT = 1
 desorb_MULT = 1
 fPHYS_MULT = 1
+
+

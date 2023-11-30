@@ -11,13 +11,13 @@ library(Metrics)
 library(DT)
 
 # Bring in RXEQ function
-source("RXEQ_ftn.R")
+source("RXEQ/RXEQ_ftn.R")
 
 # Bring in MIMICS steady state ftn
 source("MIMICS_steady_state_pools.R")
 
 # Set MIMICS parameters via R script
-source("MIMICS_parameters.R")
+source("Parameters/MIMICS_parameters_sandbox_20231129.R")
 
 #######################################################
 # Ftn to run MIMICS from steady state at hourly time-step
@@ -173,7 +173,7 @@ MIMICS_hourly <- function(MIMss, nday){
 #-------------------------------------------------------
 
 # Forcing data for LTER sites
-LTER <- read.csv("LTER_SITE_1.csv", as.is=T)
+LTER <- read.csv("Data/LTER_SITE_1.csv", as.is=T)
 
 #---------------------------------------------------------------------------
 # Example: Run MIMICS simulation forward from steady-state for 30 years
