@@ -1,5 +1,6 @@
 ########################################
-# Set MIMICS default parameters
+# Set MIMICS default parameters 
+# used for MIMICS-CN code in Rocci et al. 2023, SBB
 ########################################
 Vslope  <- rep(0.063, 6)
 Vint    <- rep(5.47, 6)
