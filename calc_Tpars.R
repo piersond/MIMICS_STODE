@@ -1,10 +1,96 @@
+#----------------------------------------------------------------
 ### Ftn to calc MIMICS parameters (take inputs, return Tpars)
 #----------------------------------------------------------------
 
 # Load MIMICS parameters
-source("set_MIMICS_params.R")
+source("Parameters/MIMICS_parameters_sandbox_20231129.R")
 
-calc_Tpars <- function(TSOI, ANPP, CLAY, CN, LIG, x, exud,fW=1,nUPmod=1) {
+# Assumes:
+# -- ANPP is gC, not gDW
+# -- Clay is a fraction (0-1)
+# TODO add fW calculation to this series of calculations
+calc_Tpars_Conly <- function(TSOI, ANPP, fCLAY, 
+                             CN, LIG, LIG_N=NA,
+                             fW=1, MAT=20, historic=FALSE) {
+  if (historic==TRUE) {
+    # ------------ MSBio MAT sensitive Vmax -----------
+    #--> Historically 'cold' site decomp ~11.5% faster at 15 C
+    #--> Historically 'warm' site decomp ~5% faster at 25 C
+    #--> TODO, make these parameters for the parameter file.  
+    Vslope = Vslope + (MAT*0.00104) 
+    Vint = Vint - (MAT*0.0228) 
+  }
+  
+  if (is.na(LIG_N)) {
+    LIG_N <- (LIG/100)/(1/(CN/2.5))
+  }
+
+  fMET  <- fmet_p[1] * (fmet_p[2] - fmet_p[3] * LIG_N) 
+  # Calc litter input rate
+  EST_LIT <- (ANPP / (365*24)) * 1e3 / 1e4
+
+  # ------------ calculate time varying parameters ---------------
+
+  Vmax     <- exp(TSOI * Vslope + Vint) * aV * fW   #<-- Moisture scalar applied
+  Km       <- exp(TSOI * Kslope + Kint) * aK
+  
+  Tau_MOD1 <- sqrt(ANPP/Tau_MOD[1])         
+  Tau_MOD2 <- Tau_MOD[4]                        
+  Tau_MOD1[Tau_MOD1 < Tau_MOD[2]] <- Tau_MOD[2]
+  Tau_MOD1[Tau_MOD1 > Tau_MOD[3]] <- Tau_MOD[3] 
+  
+  tau <- c(tau_r[1]*exp(tau_r[2]*fMET), 
+           tau_K[1]*exp(tau_K[2]*fMET))   
+  tau <- tau * Tau_MOD1 * Tau_MOD2 * Tau_MULT * fW #<-- Moisture scalar SHOULD NOT applied
+  
+  fPHYS    <- c(fPHYS_r[1] * exp(fPHYS_r[2]*fCLAY), 
+                fPHYS_K[1] * exp(fPHYS_K[2]*fCLAY)) 	            
+  fCHEM    <- c(fCHEM_r[1] * exp(fCHEM_r[2]*fMET) * fCHEM_r[3], 
+                fCHEM_K[1] * exp(fCHEM_K[2]*fMET) * fCHEM_K[3]) 	
+  fAVAI    <- 1 - (fPHYS + fCHEM)
+  
+  desorb   <- fSOM_p[1] * exp(fSOM_p[2]*(fCLAY))                  
+  desorb   <- desorb * desorb_MULT
+  fPHYS    <- fPHYS * fPHYS_MULT
+  
+  pSCALAR  <- PHYS_scalar[1] * exp(PHYS_scalar[2]*(sqrt(fCLAY)))  #Scalar for texture effects on SOMp
+  
+  v_MOD    <- vMOD  
+  k_MOD    <- kMOD 
+  k_MOD[3] <- k_MOD[3] * pSCALAR    
+  k_MOD[6] <- k_MOD[6] * pSCALAR    
+  
+  VMAX     <- Vmax * v_MOD 
+  KM       <- Km / k_MOD
+  
+  I       <- array(NA, dim=2)             
+  I[1]    <- (EST_LIT / depth) * fMET     
+  I[2]    <- (EST_LIT / depth) * (1-fMET)
+  Inputs  <- I
+  
+  LITmin  <- rep(NA, dim=4)
+  MICtrn  <- c(NA,NA,NA,NA,NA,NA)
+  SOMmin  <- rep(NA, dim=2)
+  DEsorb  <- rep(NA, dim=1)
+  OXIDAT  <- rep(NA, dim=1)
+  
+  #Tpars <- c( I = I, VMAX = VMAX, KM = KM, CUE = CUE, 
+  #            fPHYS = fPHYS, fCHEM = fCHEM, fAVAI = fAVAI, FI = FI, 
+  #            tau = tau, LITmin = LITmin, SOMmin = SOMmin, MICtrn = MICtrn, 
+  #            desorb = desorb, DEsorb = DEsorb, OXIDAT = OXIDAT, KO = KO)
+  Tpars <- list( I = I, VMAX = VMAX, KM = KM, CUE = CUE,
+                 fPHYS = fPHYS, fCHEM = fCHEM, fAVAI = fAVAI, FI = FI, 
+                 tau = tau, LITmin = LITmin, SOMmin = SOMmin, MICtrn = MICtrn, 
+                 desorb = desorb, DEsorb = DEsorb, OXIDAT = OXIDAT, KO = KO)
+  
+  
+  return(Tpars)
+}
+
+## as Inputs## as above, but for CN code
+source("Parameters/set_MIMICS_params_CN.R")
+
+calc_Tpars_CN <- function(TSOI, ANPP, CLAY, CN, LIG, x, fW=1,nUPmod=1) {
   
   ANPP        <- ANPP/2
   fCLAY       <- CLAY/100
@@ -54,20 +140,12 @@ calc_Tpars <- function(TSOI, ANPP, CLAY, CN, LIG, x, exud,fW=1,nUPmod=1) {
   VMAX     <- Vmax * v_MOD * fW
   KM       <- Km / k_MOD
     
-  # Inputs now include root exudates
   I       <- array(NA, dim=3)             
   I[1]    <- (EST_LIT / depth) * fMET     
   I[2]    <- (EST_LIT / depth) * (1-fMET)
   I[3]    <- 0  
-  if (x >= 2) {  # Priming exud to SOMa, no change in inputs
-    I[3] = I[1] * exud
-    I[1] = I[1] - I[3]
-  } 
-  if (x == 3) {   #Priming + Mining10% increase on desorbtion.
-    desorb = desorb * (1+exud)
-  }
-
   Inputs <- I
+  
   # initialize pools with small values
   lit     <- array(I[1], dim=2)      
   mic     <- array(I[1], dim=2)   
@@ -111,10 +189,3 @@ calc_Tpars <- function(TSOI, ANPP, CLAY, CN, LIG, x, exud,fW=1,nUPmod=1) {
   
   return(Tpars)
 }
-
-#e.g.
-#t1 = calc_Tpars(TSOI = 7, ANPP = 500, CLAY = 40, CN =20, LIG = 15,x=1)
-#t2 = calc_Tpars(TSOI = 8, ANPP = 500, CLAY = 40, CN =20, LIG = 15,x=1)
-
-#t1['VMAX1']
-#t2['VMAX1']
