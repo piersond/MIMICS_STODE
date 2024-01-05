@@ -98,89 +98,11 @@ MIMICS_SS <- function(df){
   ############################################################
   # MIMICS MODEL CODE STARTS HERE
   ############################################################
-  # TODO, but this inside the Tpars loop?
-
-  
-  calc_Tpars=FALSE
-  if (calc_Tpars == TRUE) {
-    
-    Tpars <- calc_Tpars_Conly(TSOI=TSOI, ANPP=ANPP, fCLAY=fCLAY, 
+  # function calculates fMETE with LIG_N if provided in input data.
+  Tpars <- calc_Tpars_Conly(TSOI=TSOI, ANPP=ANPP, fCLAY=fCLAY, 
                               CN=CN, LIG=LIG, LIG_N=LIG_N, 
                               fW=fW, MAT=MAT, historic=TRUE)
     
-  } else {  
-    ###########################################################
-    ### Set fMET equation
-    ###########################################################
-    ## Defualt fMET equation using lig:N values
-    fMET <- fmet_p[1] * (fmet_p[2] - fmet_p[3] * LIG_N) 
-    
-    ## MIMICS et al 2015 = LTER ~fMET values equal average from LiDET study
-    #fMET <- 0.3846423
-
-    # ------------ MSBio MAT sensitive Vmax -----------
-    #--> Historically 'cold' site decomp ~11.5% faster at 15 C
-    #--> Historically 'warm' site decomp ~5% faster at 25 C
-    Vslope = Vslope + (MAT*0.00104) 
-    Vint = Vint - (MAT*0.0228) 
-      
-    # ------------ caclulate parameters ---------------
-    Vmax     <- exp(TSOI * Vslope + Vint) * aV * fW   #<--------------- Moisture scalar applied.
-    Km       <- exp(TSOI * Kslope + Kint) * aK
-    
-    #ANPP strongly correlated with MAP
-    Tau_MOD1 <- sqrt(ANPP/Tau_MOD[1])         
-    Tau_MOD2 <- Tau_MOD[4]                        
-    Tau_MOD1[Tau_MOD1 < Tau_MOD[2]] <- Tau_MOD[2]
-    Tau_MOD1[Tau_MOD1 > Tau_MOD[3]] <- Tau_MOD[3] 
-    
-    tau <- c(tau_r[1]*exp(tau_r[2]*fMET), 
-             tau_K[1]*exp(tau_K[2]*fMET))   
-    tau <- tau * Tau_MOD1 * Tau_MOD2 * Tau_MULT * fW   #<--------------- Moisture scalar applied.
-    
-    fPHYS    <- c(fPHYS_r[1] * exp(fPHYS_r[2]*fCLAY), 
-                  fPHYS_K[1] * exp(fPHYS_K[2]*fCLAY)) 	            
-    fCHEM    <- c(fCHEM_r[1] * exp(fCHEM_r[2]*fMET) * fCHEM_r[3], 
-                  fCHEM_K[1] * exp(fCHEM_K[2]*fMET) * fCHEM_K[3]) 	
-    fAVAI    <- 1 - (fPHYS + fCHEM)
-    
-    desorb   <- fSOM_p[1] * exp(fSOM_p[2]*(fCLAY))                  
-    
-    desorb <- desorb * desorb_MULT
-    fPHYS <- fPHYS * fPHYS_MULT
-    
-    pSCALAR  <- PHYS_scalar[1] * exp(PHYS_scalar[2]*(sqrt(fCLAY)))  #Scalar for texture effects on SOMp
-    
-    v_MOD    <- vMOD  
-    k_MOD    <- kMOD 
-    k_MOD[3] <- k_MOD[3] * pSCALAR    
-    k_MOD[6] <- k_MOD[6] * pSCALAR    
-    
-    VMAX     <- Vmax * v_MOD 
-    KM       <- Km / k_MOD
-
-    # Calc litter input rate
-    EST_LIT <- (ANPP / (365*24)) * 1e3 / 1e4
-    #----------initialize pools---------------
-    I       <- array(NA, dim=2)             
-    I[1]    <- (EST_LIT / depth) * fMET     
-    I[2]    <- (EST_LIT / depth) * (1-fMET)
-
-    LITmin  <- rep(NA, dim=4)
-    MICtrn  <- c(NA,NA,NA,NA,NA,NA)
-    SOMmin  <- rep(NA, dim=2)
-    DEsorb  <- rep(NA, dim=1)
-    OXIDAT  <- rep(NA, dim=1)
-
-    Tpars <- list( I = I, VMAX = VMAX, KM = KM, CUE = CUE, 
-                   fPHYS = fPHYS, fCHEM = fCHEM, fAVAI = fAVAI, FI = FI, 
-                   tau = tau, LITmin = LITmin, SOMmin = SOMmin, 
-                   MICtrn = MICtrn, desorb = desorb, DEsorb = DEsorb, 
-                   OXIDAT = OXIDAT, KO = KO)
-    
-  }
-  print(Tpars)
-  print(Tpars$I[1])
   # Create arrays to hold output
   lit     <- Tpars$I
   mic     <- Tpars$I
