@@ -8,22 +8,41 @@ source("Parameters/MIMICS_parameters_sandbox_20231129.R")
 # Assumes:
 # -- ANPP is gC, not gDW
 # -- Clay is a fraction (0-1)
+# -- fWmethod is a describes how to calculate fW 0=none 1=corpse, 2=calibrated 
+# -- historic is a logical for using historic MAT to modify Vslope & Vint
+
 # TODO add fW calculation to this series of calculations
-calc_Tpars_Conly <- function(TSOI, ANPP, fCLAY, 
-                             CN, LIG, LIG_N=NA,
-                             fW=1, MAT=20, historic=FALSE) {
+calc_Tpars_Conly <- function(TSOI, ANPP, fCLAY, CN, LIG, LIG_N=NA,
+                             fWmethod = 0, theta_liq=NA,theta_frzn=NA,
+                             historic=FALSE, MAT=NA ) {
+  if (is.na(LIG_N)) {
+    LIG_N <- (LIG/100)/(1/(CN/2.5))
+  }
+
+  if (fWmethod==0) {
+    fW=1
+  } else if (fWmethod==1) {
+
+    air_filled_porosity = max(0.0, 1.0-theta_liq-theta_frzn)
+    fW = (theta_liq^3 * air_filled_porosity^2.5)/0.022600567942709
+    fW = max(0.05, fW)
+    
+  } else if (fWmethod==2) {
+    
+    air_filled_porosity = max(0.0, 1.0-theta_liq-theta_frzn)
+    f <- function(x, p1, p2) {x^p1 * (1-x)^p2}
+    fW_p3 <- optimize(f, interval=c(0.01,1), p1=fW_p1, p2=fW_p2, maximum = T)$objective
+    fW = (theta_liq^fW_p1 * air_filled_porosity^fW_p2)/fW_p3
+    fW = max(0.05, fW) 
+    
+  }
+  
+  
   if (historic==TRUE) {
-    # ------------ MSBio MAT sensitive Vmax -----------
-    #--> Historically 'cold' site decomp ~11.5% faster at 15 C
-    #--> Historically 'warm' site decomp ~5% faster at 25 C
-    #--> TODO, make these parameters for the parameter file.  
     Vslope = Vslope + (MAT*0.00104) 
     Vint = Vint - (MAT*0.0228) 
   }
   
-  if (is.na(LIG_N)) {
-    LIG_N <- (LIG/100)/(1/(CN/2.5))
-  }
 
   fMET  <- fmet_p[1] * (fmet_p[2] - fmet_p[3] * LIG_N) 
   # Calc litter input rate

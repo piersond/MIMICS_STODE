@@ -50,6 +50,10 @@ MIMICS_SS <- function(df){
   LIG <- df$LIG
   CN <- df$CN
 
+  # Include soil moisture information
+  theta_liq  <- df$grav.moisture/100 
+  theta_frzn = 0
+
   ### Bring in mean annual temperature data
   MAT <- df$MAT  
   
@@ -58,50 +62,14 @@ MIMICS_SS <- function(df){
     MAT <- TSOI
   }
 
-  ##########################################################
-  ### CHOOSE SOIL MOISTURE CONTROL IMPLEMENTATION
-  ##########################################################
-  
-  # Option 1 = CORPSE
-  # Option 2 = Pierson-CORPSE
-  # Option 3 = OFF (i.e., no soil moisture control on decomposition)
-  
-  moisture_option = 2
-  
-  #------------------------------------------------------------------
-  
-  if(moisture_option == 1) {
-    # CORPSE IMPLEMENTATION OF MOISTURE CONTROL
-    ##########################################################
-    theta_liq  <- df$grav_moisture/100
-    theta_frzn = 0
-    air_filled_porosity = max(0.0, 1.0-theta_liq-theta_frzn)
-    fW = (theta_liq^3 * air_filled_porosity^2.5)/0.022600567942709
-    fW = max(0.05, fW)
-  } else if(moisture_option == 2) {
-    # PIERSON-CORPSE IMPLEMENTATION OF MOISTURE CONTROL
-    #----------------------------------------------------------------------------------------------------
-    theta_liq  <- df$grav.moisture/100 
-    theta_frzn = 0
-    air_filled_porosity = max(0.0, 1.0-theta_liq-theta_frzn)
-    
-    f <- function(x, p1, p2) {x^p1 * (1-x)^p2}
-    fW_p3 <- optimize(f, interval=c(0.01,1), p1=fW_p1, p2=fW_p2, maximum = T)$objective
-    
-    fW = (theta_liq^fW_p1 * air_filled_porosity^fW_p2)/fW_p3
-    fW = max(0.05, fW) 
-  } else {
-    # Turn off moisture control (comment out to turn on)
-    fW = 1 
-  }
-  
   ############################################################
   # MIMICS MODEL CODE STARTS HERE
   ############################################################
   # function calculates fMETE with LIG_N if provided in input data.
   Tpars <- calc_Tpars_Conly(TSOI=TSOI, ANPP=ANPP, fCLAY=fCLAY, 
-                              CN=CN, LIG=LIG, LIG_N=LIG_N, 
-                              fW=fW, MAT=MAT, historic=TRUE)
+                            CN=CN, LIG=LIG, LIG_N=LIG_N, 
+                            fWmethod=2, theta_liq=theta_liq,theta_frzn=theta_frzn,
+                            historic=TRUE, MAT=MAT)
     
   # Create arrays to hold output
   lit     <- Tpars$I
