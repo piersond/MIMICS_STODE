@@ -1,5 +1,8 @@
+rm(list = ls())
+
 ## Set working drive
-setwd("C:/github/MIMICS_STODE")
+setwd("/Users/wwieder/Will/git_repos_local/MIMICS_STODE")
+#setwd("C:/github/MIMICS_STODE")
 
 #Libraries
 library(rootSolve)
@@ -65,57 +68,64 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, lita
   SOM_2    <- (MIMss[[1]][6] / depth) / (1e4 / 1e6)  
   SOM_3    <- (MIMss[[1]][7] / depth) / (1e4 / 1e6)  
   
+  print('fPHYS')
+  print(MIMss[[2]]$fPHYS[1])
+  print('MIMss')
+  print(MIMss[[1]])
+  print('MIC_1')
+  print(MIC_1)
+  print('product')
+  print(MIC_1 * tau[1]  * fPHYS[1])
   # Init rates
-  I        <- MIMss[[2]][1:2]
-  VMAX     <- MIMss[[2]][3:8]
-  KM       <- MIMss[[2]][9:14]
-  CUE      <- MIMss[[2]][15:18]
-  fPHYS    <-  MIMss[[2]][19:20]
-  fCHEM    <-  MIMss[[2]][21:22]
-  fAVAI    <-  MIMss[[2]][23:24]
-  fI       <-  MIMss[[2]][25:26]
-  tau      <- MIMss[[2]][27:28]
-  desorb   <- MIMss[[2]][37]
-  DEsorb   <- MIMss[[2]][38]
-  OXIDAT   <- MIMss[[2]][39]
-  KO       <- MIMss[[2]][40:41]
+  I        <- MIMss[[2]]$I
+  VMAX     <- MIMss[[2]]$VMAX
+  KM       <- MIMss[[2]]$KM
+  CUE      <- MIMss[[2]]$CUE
+  fPHYS    <-  MIMss[[2]]$fPHYS
+  fCHEM    <-  MIMss[[2]]$fCEHM
+  fAVAI    <-  MIMss[[2]]$fAVAIL
+  FI       <-  MIMss[[2]]$FI
+  tau      <- MIMss[[2]]$tau
+  desorb   <- MIMss[[2]]$desorb
+  DEsorb   <- MIMss[[2]]$DEsorb
+  OXIDAT   <- MIMss[[2]]$OXIDAT
+  KO       <- MIMss[[2]]$KO
   
   sim_year = 0
   
   for (d in 1:nday)  { 
     for (h in 1:24)   {
       #Fluxes at each time step
-      LITmin  <- rep(NA, dim=4)
-      LITbag  <- rep(NA, dim=4)
-      MICtrn  <- rep(NA, dim=6)
-      SOMmin  <- rep(NA, dim=2)
-      DEsorb  <- rep(NA, dim=1)
-      OXIDAT  <- rep(NA, dim=1)
+      LITmin  <- rep(NA,4)
+      LITbag  <- rep(NA,4)
+      MICtrn  <- rep(NA,6)
+      SOMmin  <- rep(NA,2)
+      DEsorb  <- rep(NA,1)
+      OXIDAT  <- rep(NA,1)
       
       # --- Reverse MM version ---
-      
+      print(MICtrn[2])
       #Flows to and from MIC_1
-      LITmin[1] = MIC_1 * VMAX[1] * LIT_1 / (KM[1] + MIC_1)   #MIC_1 decomp of MET lit
-      LITmin[2] = MIC_1 * VMAX[2] * LIT_2 / (KM[2] + MIC_1)   #MIC_1 decomp of STRUC lit
-      LITbag[1] = MIC_1 * VMAX[1] * LITbag_1 / (KM[1] + MICbag_1)   #MIC_1 mineralization of METABOLIC litter
-      LITbag[2] = MIC_1 * VMAX[2] * LITbag_2 / (KM[2] + MICbag_2)   #MIC_1 mineralization of STRUC litter
-      SOMmin[1] = MIC_1 * VMAX[3] * SOM_3 / (KM[3] + MIC_1)   #Decomp of SOMa by MIC_1
+      LITmin[1] <- MIC_1 * VMAX[1] * LIT_1 / (KM[1] + MIC_1)   #MIC_1 decomp of MET lit
+      LITmin[2] <- MIC_1 * VMAX[2] * LIT_2 / (KM[2] + MIC_1)   #MIC_1 decomp of STRUC lit
+      LITbag[1] <- MIC_1 * VMAX[1] * LITbag_1 / (KM[1] + MICbag_1)   #MIC_1 mineralization of METABOLIC litter
+      LITbag[2] <- MIC_1 * VMAX[2] * LITbag_2 / (KM[2] + MICbag_2)   #MIC_1 mineralization of STRUC litter
+      SOMmin[1] <- MIC_1 * VMAX[3] * SOM_3 / (KM[3] + MIC_1)   #Decomp of SOMa by MIC_1
       
-      MICtrn[1] = MIC_1 * tau[1]  * fPHYS[1]                  #MIC_1 turnover to SOMp
-      MICtrn[2] = MIC_1 * tau[1]  * fCHEM[1]                  #MIC_1 turnover to SOMc  
-      MICtrn[3] = MIC_1 * tau[1]  * fAVAI[1]                  #MIC_1 turnover to SOMa 
+      MICtrn[1] <- MIC_1 * tau[1]  * fPHYS[1]                  #MIC_1 turnover to SOMp
+      MICtrn[2] <- MIC_1 * tau[1]  * fCHEM[1]                  #MIC_1 turnover to SOMc  
+      MICtrn[3] <- MIC_1 * tau[1]  * fAVAI[1]                  #MIC_1 turnover to SOMa 
       
       #Flows to and from MIC_2
-      LITmin[3] = MIC_2 * VMAX[4] * LIT_1 / (KM[4] + MIC_2)   #decomp of MET litter
-      LITmin[4] = MIC_2 * VMAX[5] * LIT_2 / (KM[5] + MIC_2)   #decomp of SRUCTURAL litter
-      LITbag[3] = MIC_2 * VMAX[4] * LITbag_1 / (KM[4] + MICbag_1)   #mineralization of MET litter
-      LITbag[4] = MIC_2 * VMAX[5] * LITbag_2 / (KM[5] + MICbag_2)   #mineralization of SRUCTURAL litter
-      SOMmin[2] = MIC_2 * VMAX[6] * SOM_3 / (KM[6] + MIC_2)   #decomp of PHYSICAL SOM by MIC_1
+      LITmin[3] <- MIC_2 * VMAX[4] * LIT_1 / (KM[4] + MIC_2)   #decomp of MET litter
+      LITmin[4] <- MIC_2 * VMAX[5] * LIT_2 / (KM[5] + MIC_2)   #decomp of SRUCTURAL litter
+      LITbag[3] <- MIC_2 * VMAX[4] * LITbag_1 / (KM[4] + MICbag_1)   #mineralization of MET litter
+      LITbag[4] <- MIC_2 * VMAX[5] * LITbag_2 / (KM[5] + MICbag_2)   #mineralization of SRUCTURAL litter
+      SOMmin[2] <- MIC_2 * VMAX[6] * SOM_3 / (KM[6] + MIC_2)   #decomp of PHYSICAL SOM by MIC_1
       
-      MICtrn[4] = MIC_2 * tau[2]  * fPHYS[2]                  #MIC_2 turnover to SOMp 
-      MICtrn[5] = MIC_2 * tau[2]  * fCHEM[2]                  #MIC_2 turnover to SOMc 
-      MICtrn[6] = MIC_2 * tau[2]  * fAVAI[2]                  #MIC_2 turnover to SOMa  
-      
+      MICtrn[4] <- MIC_2 * tau[2]  * fPHYS[2]                  #MIC_2 turnover to SOMp 
+      MICtrn[5] <- MIC_2 * tau[2]  * fCHEM[2]                  #MIC_2 turnover to SOMc 
+      MICtrn[6] <- MIC_2 * tau[2]  * fAVAI[2]                  #MIC_2 turnover to SOMa  
       
       DEsorb    = SOM_1 * desorb  #* (MIC_1 + MIC_2)  #desorbtion of PHYS to AVAIL (function of fCLAY)
       OXIDAT    = ((MIC_2 * VMAX[5] * SOM_2 / (KO[2]*KM[5] + MIC_2)) +
