@@ -43,146 +43,97 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, lita
   
   # Get MIMICS steady_state output
   MIMss <- MIMICS_SS(forcing_df)
-  
+
+  # Create dataframe to store MIMICS pools over timesteps
+  MIMfwd = MIMss[[1]]
+  #MIMfwd = t(as.data.frame(MIMss[[1]])) 
+  MIMfwd = (MIMfwd / depth) / (1e4 / 1e6)  #convert from gC m-2 to mgC cm-3
+  # Get Tpars from ss simulation  
+  Tpars = MIMss[[2]]
+
+  #Init arrays to store daily output data
   nday   <- 365 * nspin_yrs + nspin_days
   day    <- seq(1,nday,1)
   year   <- (day-litadd_day)/365
   doy    <- 1
-  
-  #Init arrays to store daily output data
+    
   LIT    <- array(NA, dim = c(2,nday))
   LITBAG <- array(NA, dim = c(2,nday))
   MIC    <- array(NA, dim = c(2,nday))
   SOM    <- array(NA, dim = c(3,nday))
-  
-  #Init MIMICS pools
-  LIT_1    <- (MIMss[[1]][1] / depth) / (1e4 / 1e6)  
-  LIT_2    <- (MIMss[[1]][2] / depth) / (1e4 / 1e6)  
-  LITbag_1 <- 0
-  LITbag_2 <- 0
-  MIC_1    <- (MIMss[[1]][3] / depth) / (1e4 / 1e6)  
-  MIC_2    <- (MIMss[[1]][4] / depth) / (1e4 / 1e6)  
-  MICbag_1 <- (MIMss[[1]][3] / depth) / (1e4 / 1e6)  
-  MICbag_2 <- (MIMss[[1]][4] / depth) / (1e4 / 1e6)  
-  SOM_1    <- (MIMss[[1]][5] / depth) / (1e4 / 1e6)  
-  SOM_2    <- (MIMss[[1]][6] / depth) / (1e4 / 1e6)  
-  SOM_3    <- (MIMss[[1]][7] / depth) / (1e4 / 1e6)  
-  
-  print('fPHYS')
-  print(MIMss[[2]]$fPHYS[1])
-  print('MIMss')
-  print(MIMss[[1]])
-  print('MIC_1')
-  print(MIC_1)
-  print('product')
-  print(MIC_1 * tau[1]  * fPHYS[1])
-  # Init rates
-  I        <- MIMss[[2]]$I
-  VMAX     <- MIMss[[2]]$VMAX
-  KM       <- MIMss[[2]]$KM
-  CUE      <- MIMss[[2]]$CUE
-  fPHYS    <-  MIMss[[2]]$fPHYS
-  fCHEM    <-  MIMss[[2]]$fCEHM
-  fAVAI    <-  MIMss[[2]]$fAVAIL
-  FI       <-  MIMss[[2]]$FI
-  tau      <- MIMss[[2]]$tau
-  desorb   <- MIMss[[2]]$desorb
-  DEsorb   <- MIMss[[2]]$DEsorb
-  OXIDAT   <- MIMss[[2]]$OXIDAT
-  KO       <- MIMss[[2]]$KO
-  
+  LITbag_1 = 0. # initial litter bag 
+  LITbag_2 = 0
+
   sim_year = 0
-  
+  i = 1
+  dailyInputs = FALSE
+
   for (d in 1:nday)  { 
+    # TODO Recalc Tpars here, if using time varying inupts 
+    # >> Same example site input as used for stode
+    if (dailyInputs==TRUE) {
+      Tpars_mod = calc_Tpars(TSOI = TSOI, ANPP = ANPP_adj, CLAY = CLAY, 
+                             CN = CN_adj, LIG = LIG) 
+    } else {
+      Tpars_mod = Tpars
+    }  
+   
     for (h in 1:24)   {
-      #Fluxes at each time step
-      LITmin  <- rep(NA,4)
+      Ty <- c( LIT_1 = MIMfwd[1], LIT_2 = MIMfwd[2], 
+                 MIC_1 = MIMfwd[3], MIC_2 = MIMfwd[4], 
+                 SOM_1 = MIMfwd[5], SOM_2 = MIMfwd[6], 
+                 SOM_3 = MIMfwd[7])
+      
+      step = RXEQ(t=NA, y=Ty, pars=Tpars_mod)
+      
       LITbag  <- rep(NA,4)
-      MICtrn  <- rep(NA,6)
-      SOMmin  <- rep(NA,2)
-      DEsorb  <- rep(NA,1)
-      OXIDAT  <- rep(NA,1)
+      LITbag[1] <- Ty[[3]] * Tpars_mod$VMAX[1] * LITbag_1 / (Tpars_mod$KM[1] + Ty[[3]])   #MIC_1 mineralization of METABOLIC litter
+      LITbag[2] <- Ty[[3]] * Tpars_mod$VMAX[2] * LITbag_2 / (Tpars_mod$KM[2] + Ty[[3]])   #MIC_1 mineralization of STRUC litter
+      LITbag[3] <- Ty[[4]] * Tpars_mod$VMAX[4] * LITbag_1 / (Tpars_mod$KM[4] + Ty[[4]])   #mineralization of MET litter
+      LITbag[4] <- Ty[[4]] * Tpars_mod$VMAX[5] * LITbag_2 / (Tpars_mod$KM[5] + Ty[[4]])   #mineralization of SRUCTURAL litter
+
+      # Update MIMICS pools
+      #---------------------------------------------
+      MIMfwd = MIMfwd + unlist(step[[1]])
       
-      # --- Reverse MM version ---
-      print(MICtrn[2])
-      #Flows to and from MIC_1
-      LITmin[1] <- MIC_1 * VMAX[1] * LIT_1 / (KM[1] + MIC_1)   #MIC_1 decomp of MET lit
-      LITmin[2] <- MIC_1 * VMAX[2] * LIT_2 / (KM[2] + MIC_1)   #MIC_1 decomp of STRUC lit
-      LITbag[1] <- MIC_1 * VMAX[1] * LITbag_1 / (KM[1] + MICbag_1)   #MIC_1 mineralization of METABOLIC litter
-      LITbag[2] <- MIC_1 * VMAX[2] * LITbag_2 / (KM[2] + MICbag_2)   #MIC_1 mineralization of STRUC litter
-      SOMmin[1] <- MIC_1 * VMAX[3] * SOM_3 / (KM[3] + MIC_1)   #Decomp of SOMa by MIC_1
+      LITbag_1 <- LITbag_1 - LITbag[1] - LITbag[3] 
+      LITbag_2 <- LITbag_2 - LITbag[2] - LITbag[4] 
       
-      MICtrn[1] <- MIC_1 * tau[1]  * fPHYS[1]                  #MIC_1 turnover to SOMp
-      MICtrn[2] <- MIC_1 * tau[1]  * fCHEM[1]                  #MIC_1 turnover to SOMc  
-      MICtrn[3] <- MIC_1 * tau[1]  * fAVAI[1]                  #MIC_1 turnover to SOMa 
-      
-      #Flows to and from MIC_2
-      LITmin[3] <- MIC_2 * VMAX[4] * LIT_1 / (KM[4] + MIC_2)   #decomp of MET litter
-      LITmin[4] <- MIC_2 * VMAX[5] * LIT_2 / (KM[5] + MIC_2)   #decomp of SRUCTURAL litter
-      LITbag[3] <- MIC_2 * VMAX[4] * LITbag_1 / (KM[4] + MICbag_1)   #mineralization of MET litter
-      LITbag[4] <- MIC_2 * VMAX[5] * LITbag_2 / (KM[5] + MICbag_2)   #mineralization of SRUCTURAL litter
-      SOMmin[2] <- MIC_2 * VMAX[6] * SOM_3 / (KM[6] + MIC_2)   #decomp of PHYSICAL SOM by MIC_1
-      
-      MICtrn[4] <- MIC_2 * tau[2]  * fPHYS[2]                  #MIC_2 turnover to SOMp 
-      MICtrn[5] <- MIC_2 * tau[2]  * fCHEM[2]                  #MIC_2 turnover to SOMc 
-      MICtrn[6] <- MIC_2 * tau[2]  * fAVAI[2]                  #MIC_2 turnover to SOMa  
-      
-      DEsorb    = SOM_1 * desorb  #* (MIC_1 + MIC_2)  #desorbtion of PHYS to AVAIL (function of fCLAY)
-      OXIDAT    = ((MIC_2 * VMAX[5] * SOM_2 / (KO[2]*KM[5] + MIC_2)) +
-                     (MIC_1 * VMAX[2] * SOM_2 / (KO[1]*KM[2] + MIC_1)))  #oxidation of C to A
-      
-      LIT_1 = LIT_1 + I[1]*(1-FI[1]) - LITmin[1] - LITmin[3]
-      LITbag_1 <- LITbag_1 - LITbag[1] - LITbag[3] #+ I[1]*(1-FI[1])
-      MIC_1 = MIC_1 + CUE[1]*(LITmin[1]+ SOMmin[1]) + CUE[2]*(LITmin[2]) - sum(MICtrn[1:3])
-      #MICbag_1
-      SOM_1 = SOM_1 + I[1]*FI[1] + MICtrn[1] + MICtrn[4]- DEsorb 
-      
-      LIT_2 = LIT_2 + I[2] * (1-FI[2]) - LITmin[2] - LITmin[4]
-      LITbag_2 <- LITbag_2 - LITbag[2] - LITbag[4] #+ I[2] * (1-FI[2])
-      MIC_2 = MIC_2 + CUE[3]*(LITmin[3]+ SOMmin[2]) + CUE[4]*(LITmin[4]) - sum(MICtrn[4:6])  
-      #MICbag_2
-      SOM_2 = SOM_2 + I[2]*FI[2] + MICtrn[2] + MICtrn[5] - OXIDAT
-      
-      SOM_3 = SOM_3 + MICtrn[3] + MICtrn[6] + DEsorb + OXIDAT - SOMmin[1] - SOMmin[2]	#add litter bag on Oct 1
-      
+
+      # add litter on correct day
       if (d == litadd_day)   {
         if (h == 24)  {
           LITbag_1 <- LITbag_1 + as.numeric(litBAG[3])
           LITbag_2 <- LITbag_2 + as.numeric(litBAG[4])
         }
       }
-      
+          
       #write out daily results
       if (h == 24) {
-        LIT[1,d] <- LIT_1
-        LIT[2,d] <- LIT_2
+        LIT[1,d] <- MIMfwd[1]
+        LIT[2,d] <- MIMfwd[2]
         LITBAG[1,d]  <- LITbag_1
         LITBAG[2,d]  <- LITbag_2
-        MIC[1,d] <- MIC_1
-        MIC[2,d] <- MIC_2
-        SOM[1,d] <- SOM_1
-        SOM[2,d] <- SOM_2
-        SOM[3,d] <- SOM_3
-        
-        
-        #View(as.data.frame(LITBAG))
-        
-        
+        MIC[1,d] <- MIMfwd[3]
+        MIC[2,d] <- MIMfwd[4]
+        SOM[1,d] <- MIMfwd[5]
+        SOM[2,d] <- MIMfwd[6]
+        SOM[3,d] <- MIMfwd[7]
+          
         #advance day of year counter
         if (doy == 365) {
           doy <- 1
           sim_year = sim_year + 1
           if(verbose){
-            print(paste0("Finished MIMICS simulation year ", sim_year))
+              print(paste0("Finished MIMICS simulation year ", sim_year))
           }
         } else {
           doy <- doy + 1
         }                         
-      }	   						
+      } # close h=24 loop	   						
     }		#close hour loop
   }		#close daily loop
-  #return(list(LIT, LITBAG, MIC, SOM))
-  
+
   LITBAG_out <- rbind(as.data.frame(LITBAG), 
                       as.data.frame(LIT), 
                       as.data.frame(MIC),
@@ -197,6 +148,8 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, lita
   
   return(LITBAG_out)
 }
+
+
 
 
 #------------------------------------------------------------------------------
