@@ -1,5 +1,7 @@
+rm(list = ls())
+
 ## Set working drive
-setwd("C:/github/MIMICS_STODE")
+setwd("/Users/wwieder/Will/git_repos_local/MIMICS_STODE")
 
 #Libraries
 library(rootSolve)
@@ -16,6 +18,9 @@ source("RXEQ/RXEQ_ftn.R")
 # Set MIMICS parameters via R script
 source("Parameters/MIMICS_parameters_sandbox_20231129.R")
 
+# calculate Tpars via R script
+source("calc_Tpars.R")
+
 ###############################################
 # MIMICS single point function
 #>> With output required for running forward
@@ -31,7 +36,7 @@ MIMICS_SS <- function(df){
   ### Setup a var to collect run notes
   note <- ""
   
-  ###Bring in forcing ANPP value
+  ###Bring in forcing ANPP value, convert gDW to gC
   ANPP <- df$ANPP/2
   
   ### Bring in CLAY value, convert from percent to decimal
@@ -42,7 +47,13 @@ MIMICS_SS <- function(df){
   
   ### Bring in lig:N forcing data
   LIG_N <- df$LIG_N
-  
+  LIG <- df$LIG
+  CN <- df$CN
+
+  # Include soil moisture information
+  theta_liq  <- df$grav.moisture/100 
+  theta_frzn = 0
+
   ### Bring in mean annual temperature data
   MAT <- df$MAT  
   
@@ -50,147 +61,43 @@ MIMICS_SS <- function(df){
   if(is.null(MAT)){
     MAT <- TSOI
   }
-  
-  ###########################################################
-  ### Set fMET equation
-  ###########################################################
-  ## Defualt fMET equation using lig:N values
-  fMET <- fmet_p[1] * (fmet_p[2] - fmet_p[3] * LIG_N) 
-  
-  ## MIMICS et al 2015 = LTER ~fMET values equal average from LiDET study
-  #fMET <- 0.3846423
-  
-  
-  ##########################################################
-  ### CHOOSE SOIL MOISTURE CONTROL IMPLEMENTATION
-  ##########################################################
-  
-  # Option 1 = CORPSE
-  # Option 2 = Pierson-CORPSE
-  # Option 3 = OFF (i.e., no soil moisture control on decomposition)
-  
-  moisture_option = 2
-  
-  #------------------------------------------------------------------
-  
-  if(moisture_option == 1) {
-    # CORPSE IMPLEMENTATION OF MOISTURE CONTROL
-    ##########################################################
-    theta_liq  <- df$grav_moisture/100
-    theta_frzn = 0
-    air_filled_porosity = max(0.0, 1.0-theta_liq-theta_frzn)
-    fW = (theta_liq^3 * air_filled_porosity^2.5)/0.022600567942709
-    fW = max(0.05, fW)
-  } else if(moisture_option == 2) {
-    # PIERSON-CORPSE IMPLEMENTATION OF MOISTURE CONTROL
-    #----------------------------------------------------------------------------------------------------
-    theta_liq  <- df$grav.moisture/100 
-    theta_frzn = 0
-    air_filled_porosity = max(0.0, 1.0-theta_liq-theta_frzn)
-    
-    f <- function(x, p1, p2) {x^p1 * (1-x)^p2}
-    fW_p3 <- optimize(f, interval=c(0.01,1), p1=fW_p1, p2=fW_p2, maximum = T)$objective
-    
-    fW = (theta_liq^fW_p1 * air_filled_porosity^fW_p2)/fW_p3
-    fW = max(0.05, fW) 
-  } else {
-    # Turn off moisture control (comment out to turn on)
-    fW = 1 
-  }
-  
+
   ############################################################
   # MIMICS MODEL CODE STARTS HERE
   ############################################################
-  
-  # Calc litter input rate
-  EST_LIT <- (ANPP / (365*24)) * 1e3 / 1e4
-  
-  # ------------ MSBio MAT sensitive Vmax -----------
-     #--> Historically 'cold' site decomp ~11.5% faster at 15 C
-     #--> Historically 'warm' site decomp ~5% faster at 25 C
-  Vslope = Vslope + (MAT*0.00104) 
-  Vint = Vint - (MAT*0.0228) 
-  
-  # ------------ caclulate parameters ---------------
-  Vmax     <- exp(TSOI * Vslope + Vint) * aV * fW   #<--------------- Moisture scalar applied.
-  Km       <- exp(TSOI * Kslope + Kint) * aK
-  
-  #ANPP strongly correlated with MAP
-  Tau_MOD1 <- sqrt(ANPP/Tau_MOD[1])         
-  Tau_MOD2 <- Tau_MOD[4]                        
-  Tau_MOD1[Tau_MOD1 < Tau_MOD[2]] <- Tau_MOD[2]
-  Tau_MOD1[Tau_MOD1 > Tau_MOD[3]] <- Tau_MOD[3] 
-  
-  tau <- c(tau_r[1]*exp(tau_r[2]*fMET), 
-           tau_K[1]*exp(tau_K[2]*fMET))   
-  tau <- tau * Tau_MOD1 * Tau_MOD2 * Tau_MULT * fW   #<--------------- Moisture scalar applied.
-  
-  fPHYS    <- c(fPHYS_r[1] * exp(fPHYS_r[2]*fCLAY), 
-                fPHYS_K[1] * exp(fPHYS_K[2]*fCLAY)) 	            
-  fCHEM    <- c(fCHEM_r[1] * exp(fCHEM_r[2]*fMET) * fCHEM_r[3], 
-                fCHEM_K[1] * exp(fCHEM_K[2]*fMET) * fCHEM_K[3]) 	
-  fAVAI    <- 1 - (fPHYS + fCHEM)
-  
-  desorb   <- fSOM_p[1] * exp(fSOM_p[2]*(fCLAY))                  
-  
-  desorb <- desorb * desorb_MULT
-  fPHYS <- fPHYS * fPHYS_MULT
-  
-  pSCALAR  <- PHYS_scalar[1] * exp(PHYS_scalar[2]*(sqrt(fCLAY)))  #Scalar for texture effects on SOMp
-  
-  v_MOD    <- vMOD  
-  k_MOD    <- kMOD 
-  k_MOD[3] <- k_MOD[3] * pSCALAR    
-  k_MOD[6] <- k_MOD[6] * pSCALAR    
-  
-  VMAX     <- Vmax * v_MOD 
-  KM       <- Km / k_MOD
-  
-  #----------initialize pools---------------
-  I       <- array(NA, dim=2)             
-  I[1]    <- (EST_LIT / depth) * fMET     
-  I[2]    <- (EST_LIT / depth) * (1-fMET)
-  
-  lit     <- I   
-  mic     <- I  
+  # function calculates fMETE with LIG_N if provided in input data.
+  Tpars <- calc_Tpars_Conly(TSOI=TSOI, ANPP=ANPP, fCLAY=fCLAY, 
+                            CN=CN, LIG=LIG, LIG_N=LIG_N, 
+                            fWmethod=2, theta_liq=theta_liq,theta_frzn=theta_frzn,
+                            historic=TRUE, MAT=MAT)
+    
+  # Create arrays to hold output
+  lit     <- Tpars$I
+  mic     <- Tpars$I
   som     <- rep(NA, 3) 
-  som[1]  <- I[1]
-  som[2]  <- I[2]
-  som[3]  <- I[1] 
-  CO2     <- rep(NA, 2) 
-  CO2[1]    <- 0
-  CO2[2]    <- 0
-  
-  LITmin  <- rep(NA, dim=4)
-  MICtrn  <- c(NA,NA,NA,NA,NA,NA)
-  SOMmin  <- rep(NA, dim=2)
-  DEsorb  <- rep(NA, dim=1)
-  OXIDAT  <- rep(NA, dim=1)
-  
-  #Calculate RXEQ pools  
-  Tpars <- c( I = I, VMAX = VMAX, KM = KM, CUE = CUE, 
-              fPHYS = fPHYS, fCHEM = fCHEM, fAVAI = fAVAI, FI = FI, 
-              tau = tau, LITmin = LITmin, SOMmin = SOMmin, MICtrn = MICtrn, 
-              desorb = desorb, DEsorb = DEsorb, OXIDAT = OXIDAT, KO = KO)
-  
+  som[1]  <- Tpars$I[1]
+  som[2]  <- Tpars$I[2]
+  som[3]  <- Tpars$I[1] 
+  CO2     <- rep(0, 2) 
+
   Ty    <- c( LIT_1 = lit[1], LIT_2 = lit[2], 
               MIC_1 = mic[1], MIC_2 = mic[2], 
               SOM_1 = som[1], SOM_2 = som[2], SOM_3 = som[3])
   
   ## Set global parameters to allow pass to stode function
-  .GlobalEnv$VMAX <- VMAX
-  .GlobalEnv$KM <- KM
-  .GlobalEnv$fPHYS <- fPHYS
-  .GlobalEnv$fCHEM <- fCHEM
-  .GlobalEnv$fAVAI <- fAVAI
-  .GlobalEnv$I <- I
-  .GlobalEnv$tau <- tau
-  .GlobalEnv$LITmin <- LITmin
-  .GlobalEnv$SOMmin <- SOMmin
-  .GlobalEnv$MICtrn <- MICtrn
-  .GlobalEnv$desorb <- desorb
-  .GlobalEnv$DEsorb <- DEsorb
-  .GlobalEnv$OXIDAT <- OXIDAT
+  .GlobalEnv$VMAX <- Tpars$VMAX
+  .GlobalEnv$KM <- Tpars$KM
+  .GlobalEnv$fPHYS <- Tpars$fPHYS
+  .GlobalEnv$fCHEM <- Tpars$fCHEM
+  .GlobalEnv$fAVAI <- Tpars$fAVAI
+  .GlobalEnv$I <- Tpars$I
+  .GlobalEnv$tau <- Tpars$tau
+  .GlobalEnv$LITmin <- Tpars$LITmin
+  .GlobalEnv$SOMmin <- Tpars$SOMmin
+  .GlobalEnv$MICtrn <- Tpars$MICtrn
+  .GlobalEnv$desorb <- Tpars$desorb
+  .GlobalEnv$DEsorb <- Tpars$DEsorb
+  .GlobalEnv$OXIDAT <- Tpars$OXIDAT
   
   # ------------RUN THE MODEL-------------
   test  <- stode(y = Ty, time = 1e7, fun = RXEQ, parms = Tpars, positive = TRUE)
@@ -305,3 +212,4 @@ ggplot(plot_data, aes(x=MIMSOC, y=SOC, color=TSOI)) +
 #   xlab("Pierson_STODE\nMIMSOC") +
 #   ylab("Wieder et al. 2015 - Sandbox\nMIMSOC") +
 #   theme_minimal()
+
