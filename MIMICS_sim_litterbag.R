@@ -1,7 +1,7 @@
-rm(list = ls())
+rm(list = ls()) #Clears the working environment
 
 ## Set working drive
-setwd("/Users/wwieder/Will/git_repos_local/MIMICS_STODE")
+#setwd("/Users/wwieder/Will/git_repos_local/MIMICS_STODE")
 #setwd("C:/github/MIMICS_STODE")
 
 #Libraries
@@ -26,7 +26,7 @@ source("Parameters/MIMICS_parameters_sandbox_20231129.R")
 # Litter bag simulation ftn
 ###############################
 
-MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, litadd_day=143, verbose=T){
+MIMICS_LITBAG <- function(forcing_df, litBAG, dailyInput=NA, nspin_yrs=10, nspin_days=200, litadd_day=143, verbose=T){
   
   #DEBUG
   #forcing_df <- LTER[6,]
@@ -37,7 +37,7 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, lita
   
   if(verbose){
     print("-------------------------------------------------------")
-    print(paste0("Starting ", forcing_df$Site, " - ", litBAG$TYPE))
+    print(paste0("Starting ", forcing_df$Site, " - ", litBAG[1]))
     print("-------------------------------------------------------")
   }
   
@@ -46,8 +46,8 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, lita
 
   # Create dataframe to store MIMICS pools over timesteps
   MIMfwd = MIMss[[1]]
-  #MIMfwd = t(as.data.frame(MIMss[[1]])) 
   MIMfwd = (MIMfwd / depth) / (1e4 / 1e6)  #convert from gC m-2 to mgC cm-3
+  
   # Get Tpars from ss simulation  
   Tpars = MIMss[[2]]
 
@@ -66,26 +66,37 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, lita
 
   sim_year = 0
   i = 1
-  dailyInputs = FALSE
 
   for (d in 1:nday)  { 
-    # TODO Recalc Tpars here, if using time varying inupts 
-    # >> Same example site input as used for stode
-    if (dailyInputs==TRUE) {
-      Tpars_mod = calc_Tpars(TSOI = TSOI, ANPP = ANPP_adj, CLAY = CLAY, 
-                             CN = CN_adj, LIG = LIG) 
+    # For recalc of Tpars from daily forcing data
+    if (!is.na(dailyInput)) {
+      # Set daily Tpars from daily state variables in "dailyInput" dataframe (added in function arguments)
+      Tpars_mod = calc_Tpars(fWmethod = 0, historic=FALSE, LiDET_fMET=FALSE, #<-- ENSURE these settings match the ss run
+                             ANPP = dailyInput$ANPP[d], 
+                             fCLAY = dailyInput$fCLAY[d], 
+                             TSOI = dailyInput$TSOI[d], 
+                             MAT = dailyInput$MAT[d], 
+                             LIG_N = dailyInput$LIG_N[d],
+                             CN = dailyInput$CN[d],  # Only needed if LIG_N not supplied 
+                             LIG = dailyInput$LIG[d],  # Only needed if LIG_N not supplied 
+                             theta_liq = dailyInput$GWC[d], 
+                             theta_frzn = 0) # Change to column name if frozen water content is available 
     } else {
+      # Use ss Tpars (i.e., same forcing variables for each sim day)
       Tpars_mod = Tpars
     }  
    
+    # Run simulation at hourly timestep
     for (h in 1:24)   {
       Ty <- c( LIT_1 = MIMfwd[1], LIT_2 = MIMfwd[2], 
                  MIC_1 = MIMfwd[3], MIC_2 = MIMfwd[4], 
                  SOM_1 = MIMfwd[5], SOM_2 = MIMfwd[6], 
                  SOM_3 = MIMfwd[7])
       
+      # Run MIMICS simulation step
       step = RXEQ(t=NA, y=Ty, pars=Tpars_mod)
       
+      # Litter bag decomp simulation step
       LITbag  <- rep(NA,4)
       LITbag[1] <- Ty[[3]] * Tpars_mod$VMAX[1] * LITbag_1 / (Tpars_mod$KM[1] + Ty[[3]])   #MIC_1 mineralization of METABOLIC litter
       LITbag[2] <- Ty[[3]] * Tpars_mod$VMAX[2] * LITbag_2 / (Tpars_mod$KM[2] + Ty[[3]])   #MIC_1 mineralization of STRUC litter
@@ -94,17 +105,17 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, lita
 
       # Update MIMICS pools
       #---------------------------------------------
-      MIMfwd = MIMfwd + unlist(step[[1]])
+      MIMfwd = MIMfwd + unlist(step[[1]]) # MIMICS pools
       
-      LITbag_1 <- LITbag_1 - LITbag[1] - LITbag[3] 
+      LITbag_1 <- LITbag_1 - LITbag[1] - LITbag[3] # Litter bag pools
       LITbag_2 <- LITbag_2 - LITbag[2] - LITbag[4] 
       
 
       # add litter on correct day
       if (d == litadd_day)   {
         if (h == 24)  {
-          LITbag_1 <- LITbag_1 + as.numeric(litBAG[3])
-          LITbag_2 <- LITbag_2 + as.numeric(litBAG[4])
+          LITbag_1 <- LITbag_1 + as.numeric(litBAG[3]) # Metabolic pool add
+          LITbag_2 <- LITbag_2 + as.numeric(litBAG[4]) # Structural pool add
         }
       }
           
@@ -134,12 +145,13 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, lita
     }		#close hour loop
   }		#close daily loop
 
+  # Compile and format output
   LITBAG_out <- rbind(as.data.frame(LITBAG), 
                       as.data.frame(LIT), 
                       as.data.frame(MIC),
                       as.data.frame(SOM))
   
-  LITBAG_out <- LITBAG_out * depth *1e4 / 1e6 
+  LITBAG_out <- LITBAG_out * depth * 1e4 / 1e6 # Soil depth and unit conversion 
   LITBAG_out <- as.data.frame(t(LITBAG_out))
   colnames(LITBAG_out) <- c("LITBAGm", "LITBAGs", "LITm", "LITs", "MICr", "MICk", "SOMp", "SOMc", "SOMa")
   LITBAG_out <- cbind(data.frame(SITE = forcing_df$Site,
@@ -163,7 +175,7 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, nspin_yrs=10, nspin_days=200, lita
 # Forcing data for LTER sites
 LTER <- read.csv("Data/LTER_SITE_1.csv", as.is=T)
 
-# LiDET litter bags
+# Import and calc LiDET litter bag data 
 LiDET_BAGS <- data.frame(TYPE = c('TRAEf', 'PIREf','THPLf','ACSAf','QUPRf','DRGLf'),
                          BAG_LIG = c(16.2, 19.2, 26.7, 15.9, 23.5, 10.9),
                          BAG_N = c(0.38, 0.59, 0.62, 0.81, 1.03, 1.97), 
@@ -201,7 +213,7 @@ forcing_input <- data.frame(Site = "TEST SITE",
 BAG_input <- BAGS[6,]
 
 # Run litterbag decomp simulation
-BAG_out <- MIMICS_LITBAG(forcing_input, BAG_input, nspin_yrs=10, nspin_days=150, litadd_day=125, verbose=T)
+BAG_out <- MIMICS_LITBAG(forcing_input, BAG_input, dailyInput=NA, nspin_yrs=10, nspin_days=150, litadd_day=125, verbose=T)
 
 # Calc MIMICS C pools
 BAG_out$MIMSOC <- rowSums(BAG_out[,6:12])
@@ -227,16 +239,16 @@ ggplot(BAG_out) +
 # Example: Run multiple litter bags thru decomp simulation
 #---------------------------------------------
 
-# BAGS_out <- BAGS %>% split(1:nrow(BAGS)) %>% map(~ MIMICS_LITBAG(litBAG=., 
-#                                                                  forcing_df=LTER[6,],
-#                                                                  nspin_yrs=20, 
-#                                                                  nspin_days=0, 
-#                                                                  litadd_day=100, 
-#                                                                  verbose=T)) %>% bind_rows()
-# ggplot() + 
-#   geom_line(data=BAGS_out, aes(y=LITBAGs+LITBAGm, x=DAY, color=Litter_Type), linewidth=1, alpha=0.5) +
-#   ylab("Litter Bag C") +
-#   xlab("Day") +
-#   labs(color="LiDET\nLitter Type") +
-#   ggtitle("MIMICS Litter Bag Simulation") +
-#   theme_bw()
+BAGS_out <- BAGS %>% split(1:nrow(BAGS)) %>% map(~ MIMICS_LITBAG(litBAG=.,
+                                                                 forcing_df=LTER[6,],
+                                                                 nspin_yrs=20,
+                                                                 nspin_days=0,
+                                                                 litadd_day=100,
+                                                                 verbose=T)) %>% bind_rows()
+ggplot() +
+  geom_line(data=BAGS_out, aes(y=LITBAGs+LITBAGm, x=DAY, color=Litter_Type), linewidth=1, alpha=0.5) +
+  ylab("Litter Bag C") +
+  xlab("Day") +
+  labs(color="LiDET\nLitter Type") +
+  ggtitle("MIMICS Litter Bag Simulation") +
+  theme_bw()
