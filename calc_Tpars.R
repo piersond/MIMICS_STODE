@@ -3,22 +3,25 @@
 #----------------------------------------------------------------
 
 # Load MIMICS parameters
-source("Parameters/MIMICS_parameters_sandbox_20231129.R")
+#source("Parameters/MIMICS_parameters_sandbox_20231129.R")
 
 # Assumes:
 # -- ANPP is gC, not gDW
 # -- Clay is a fraction (0-1)
-# -- fWmethod is a describes how to calculate fW 0=none 1=corpse, 2=calibrated 
+# -- fWmethod is describes how to calculate fW 0=none 1=corpse, 2=calibrated 
 # -- historic is a logical for using historic MAT to modify Vslope & Vint
 
 # TODO add fW calculation to this series of calculations
-calc_Tpars_Conly <- function(TSOI, ANPP, fCLAY, CN, LIG, LIG_N=NA,
-                             fWmethod = 0, theta_liq=NA,theta_frzn=NA,
-                             historic=FALSE, MAT=NA ) {
+calc_Tpars_Conly <- function(fWmethod = 0, historic=FALSE, LiDET_fMET=FALSE, 
+                             ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
+                             theta_liq=NA, theta_frzn=NA) {
+  
+  # Set lig:N value if not given
   if (is.na(LIG_N)) {
     LIG_N <- (LIG/100)/(1/(CN/2.5))
   }
 
+  # Set moisture control on kinetics (fW)
   if (fWmethod==0) {
     fW=1
   } else if (fWmethod==1) {
@@ -37,14 +40,22 @@ calc_Tpars_Conly <- function(TSOI, ANPP, fCLAY, CN, LIG, LIG_N=NA,
     
   }
   
-  
+  # For historic MAT dependent kinetics
   if (historic==TRUE) {
     Vslope = Vslope + (MAT*0.00104) 
     Vint = Vint - (MAT*0.0228) 
   }
   
 
-  fMET  <- fmet_p[1] * (fmet_p[2] - fmet_p[3] * LIG_N) 
+  # set fMET
+  if(!LiDET_fMET){
+    fMET  <- fmet_p[1] * (fmet_p[2] - fmet_p[3] * LIG_N)    
+  } else {
+    # ONLY for model validation against MIMICS et al. 2015 Sandbox 
+    fMET <- 0.3846423
+  }
+
+  
   # Calc litter input rate
   EST_LIT <- (ANPP / (365*24)) * 1e3 / 1e4
 
@@ -60,7 +71,7 @@ calc_Tpars_Conly <- function(TSOI, ANPP, fCLAY, CN, LIG, LIG_N=NA,
   
   tau <- c(tau_r[1]*exp(tau_r[2]*fMET), 
            tau_K[1]*exp(tau_K[2]*fMET))   
-  tau <- tau * Tau_MOD1 * Tau_MOD2 * Tau_MULT * fW #<-- Moisture scalar SHOULD NOT applied
+  tau <- tau * Tau_MOD1 * Tau_MOD2 * Tau_MULT #* fW #<-- TODO Should this be moisture dependent? [DP 1/12/2024]
   
   fPHYS    <- c(fPHYS_r[1] * exp(fPHYS_r[2]*fCLAY), 
                 fPHYS_K[1] * exp(fPHYS_K[2]*fCLAY)) 	            
@@ -93,21 +104,18 @@ calc_Tpars_Conly <- function(TSOI, ANPP, fCLAY, CN, LIG, LIG_N=NA,
   DEsorb  <- rep(NA, dim=1)
   OXIDAT  <- rep(NA, dim=1)
   
-  #Tpars <- c( I = I, VMAX = VMAX, KM = KM, CUE = CUE, 
-  #            fPHYS = fPHYS, fCHEM = fCHEM, fAVAI = fAVAI, FI = FI, 
-  #            tau = tau, LITmin = LITmin, SOMmin = SOMmin, MICtrn = MICtrn, 
-  #            desorb = desorb, DEsorb = DEsorb, OXIDAT = OXIDAT, KO = KO)
-  Tpars <- list( I = I, VMAX = VMAX, KM = KM, CUE = CUE,
+  Tpars <- list(I = I, VMAX = VMAX, KM = KM, CUE = CUE,
                  fPHYS = fPHYS, fCHEM = fCHEM, fAVAI = fAVAI, FI = FI, 
                  tau = tau, LITmin = LITmin, SOMmin = SOMmin, MICtrn = MICtrn, 
                  desorb = desorb, DEsorb = DEsorb, OXIDAT = OXIDAT, KO = KO)
   
-  
   return(Tpars)
 }
 
+
+#-------------------------------------------------------------------------
 ## as Inputs## as above, but for CN code
-source("Parameters/set_MIMICS_params_CN.R")
+#source("Parameters/MIMICS-CN/set_MIMICS_params_CN.R")
 
 calc_Tpars_CN <- function(TSOI, ANPP, CLAY, CN, LIG, x, fW=1,nUPmod=1) {
   

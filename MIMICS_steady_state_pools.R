@@ -1,7 +1,7 @@
-rm(list = ls())
+#rm(list = ls())
 
 ## Set working drive
-setwd("/Users/wwieder/Will/git_repos_local/MIMICS_STODE")
+#setwd("/Users/wwieder/Will/git_repos_local/MIMICS_STODE")
 
 #Libraries
 library(rootSolve)
@@ -15,14 +15,15 @@ library(DT)
 # Bring in RXEQ function
 source("RXEQ/RXEQ_ftn.R")
 
-# Set MIMICS parameters via R script
-source("Parameters/MIMICS_parameters_sandbox_20231129.R")
-
 # calculate Tpars via R script
 source("calc_Tpars.R")
 
+# Set MIMICS parameters via R script
+source("Parameters/MIMICS_parameters_sandbox_20231129.R")
+
 ###############################################
 # MIMICS single point function
+#> Input dataframe ("df") must contain columns: SITE, ANPP, fCLAY, TSOI, LIG_N or LIG + CN // Optional: MAT, GWC  
 #>> With output required for running forward
 ###############################################
 MIMICS_SS <- function(df){
@@ -30,13 +31,13 @@ MIMICS_SS <- function(df){
   #DEBUG
   #df = LTER[1,]
   
-  # Convert column names to upper case
+  # Convert all column names to upper case
   colnames(df) <- toupper(colnames(df))
   
   ### Setup a var to collect run notes
   note <- ""
   
-  ###Bring in forcing ANPP value, convert gDW to gC
+  ### Bring in forcing ANPP value, convert gDW to gC
   ANPP <- df$ANPP/2
   
   ### Bring in CLAY value, convert from percent to decimal
@@ -50,9 +51,9 @@ MIMICS_SS <- function(df){
   LIG <- df$LIG
   CN <- df$CN
 
-  # Include soil moisture information
-  theta_liq  <- df$grav.moisture/100 
-  theta_frzn = 0
+  # Bring in soil moisture information
+  theta_liq  <- df$GWC/100  # GWC = Gravimetric water content
+  theta_frzn <- 0           # Not used here. TODO Needs validation. 
 
   ### Bring in mean annual temperature data
   MAT <- df$MAT  
@@ -65,11 +66,11 @@ MIMICS_SS <- function(df){
   ############################################################
   # MIMICS MODEL CODE STARTS HERE
   ############################################################
-  # function calculates fMETE with LIG_N if provided in input data.
-  Tpars <- calc_Tpars_Conly(TSOI=TSOI, ANPP=ANPP, fCLAY=fCLAY, 
-                            CN=CN, LIG=LIG, LIG_N=LIG_N, 
-                            fWmethod=2, theta_liq=theta_liq,theta_frzn=theta_frzn,
-                            historic=TRUE, MAT=MAT)
+  # function calculates fMET with LIG_N if provided in input data.
+  Tpars <- calc_Tpars_Conly(fWmethod=0, historic=TRUE, LiDET_fMET=FALSE,      #<---- IMPORTANT USER OPTIONS HERE
+                            ANPP=ANPP, fCLAY=fCLAY, TSOI=TSOI, MAT=MAT,
+                            CN=CN, LIG=LIG, LIG_N=LIG_N,
+                            theta_liq=theta_liq, theta_frzn=theta_frzn)
     
   # Create arrays to hold output
   lit     <- Tpars$I
@@ -80,11 +81,11 @@ MIMICS_SS <- function(df){
   som[3]  <- Tpars$I[1] 
   CO2     <- rep(0, 2) 
 
-  Ty    <- c( LIT_1 = lit[1], LIT_2 = lit[2], 
+  Ty    <- c(LIT_1 = lit[1], LIT_2 = lit[2], 
               MIC_1 = mic[1], MIC_2 = mic[2], 
               SOM_1 = som[1], SOM_2 = som[2], SOM_3 = som[3])
   
-  ## Set global parameters to allow pass to stode function
+  ## Set global parameters to ensure passing of variables to stode function
   .GlobalEnv$VMAX <- Tpars$VMAX
   .GlobalEnv$KM <- Tpars$KM
   .GlobalEnv$fPHYS <- Tpars$fPHYS
@@ -152,6 +153,8 @@ MIMICS_SS_format <- function(MIMICS_SS_output) {
 #--- EXAMPLE USE ---
 #------------------------------------------------------------------------------
 
+#>> Set working drive to the script directory (repo main)
+
 #-------------------------------------------------------
 # Load LTER forcing dataset for example simulations
 #-------------------------------------------------------
@@ -169,7 +172,7 @@ MIMout_single_raw <- MIMICS_SS(LTER[1,])
 MIMICS_ss_tbl <- MIMICS_SS_format(MIMout_single_raw)
 
 # View table
-datatable(MIMICS_ss_tbl %>% mutate_if(is.numeric, round, digits=3))
+#datatable(MIMICS_ss_tbl %>% mutate_if(is.numeric, round, digits=3))
 
 #---------------------------------------------------------------------------
 # Example: Find steady state pools for a forcing dataset
@@ -179,37 +182,37 @@ MIMruns <- LTER %>% split(1:nrow(LTER)) %>% map(~ MIMICS_SS(df=.))
 MIMruns_format <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
 MIMICS_ss_dataset <- LTER[,1:2] %>% cbind(MIMruns_format %>% select(-SITE, -SOC))  # Bind data info columns to MIMICS output
 
-# View table
-datatable(MIMICS_ss_dataset %>% mutate_if(is.numeric, round, digits=3))
-
-
-# Plot field vs MIMICS SOC
-#---------------------------------
-plot_data <- MIMICS_ss_dataset
-
-# Calc SOC vs. MIMSOC r2 and RMSE
-r2_test <- cor.test(plot_data$SOC, plot_data$MIMSOC)
-r_val <- round(as.numeric(unlist(r2_test ['estimate'])),2)
-lb2 <- paste("R^2 == ", r_val)
-
-rmse <- round(rmse(plot_data$SOC, plot_data$MIMSOC),2)
-
-# Plot SOC vs. MIMSOC
-ggplot(plot_data, aes(x=MIMSOC, y=SOC, color=TSOI)) +
-  geom_abline(intercept = 0, slope = 1, linetype = "dashed")+
-  geom_point(size=4, alpha=0.8) +
-  geom_text(aes(label=paste0(Site)),hjust=-0.2, vjust=0.2) +
-  annotate("text", label = lb2, x = 2, y = 8.5, size = 4, colour = "black", parse=T) +
-  annotate("text", label = paste0("RMSE = ", rmse), x = 2, y = 7.4, size = 4, colour = "black") +
-  ylim(0,10) + xlim(0,10) +
-  theme_minimal()
-
-# Check against sandbox
-# Run the sandbox MIMICS script, then run...
-# plot_data$Wieder_2015_MIMSOC <- MIMSOC
-# ggplot(plot_data, aes(x=MIMSOC, y=Wieder_2015_MIMSOC)) + geom_point(size=3) +
-#   geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
-#   xlab("Pierson_STODE\nMIMSOC") +
-#   ylab("Wieder et al. 2015 - Sandbox\nMIMSOC") +
+# # View table
+# datatable(MIMICS_ss_dataset %>% mutate_if(is.numeric, round, digits=3))
+# 
+# 
+# # Plot field vs MIMICS SOC
+# #---------------------------------
+# plot_data <- MIMICS_ss_dataset
+# 
+# # Calc SOC vs. MIMSOC r2 and RMSE
+# r2_test <- cor.test(plot_data$SOC, plot_data$MIMSOC)
+# r_val <- round(as.numeric(unlist(r2_test ['estimate'])),2)
+# lb2 <- paste("R^2 == ", r_val)
+# 
+# rmse <- round(rmse(plot_data$SOC, plot_data$MIMSOC),2)
+# 
+# # Plot SOC vs. MIMSOC
+# ggplot(plot_data, aes(x=MIMSOC, y=SOC, color=TSOI)) +
+#   geom_abline(intercept = 0, slope = 1, linetype = "dashed")+
+#   geom_point(size=4, alpha=0.8) +
+#   geom_text(aes(label=paste0(Site)),hjust=-0.2, vjust=0.2) +
+#   annotate("text", label = lb2, x = 2, y = 8.5, size = 4, colour = "black", parse=T) +
+#   annotate("text", label = paste0("RMSE = ", rmse), x = 2, y = 7.4, size = 4, colour = "black") +
+#   ylim(0,10) + xlim(0,10) +
 #   theme_minimal()
+# 
+# # Check against sandbox
+# # Run the sandbox MIMICS script, then run...
+# # plot_data$Wieder_2015_MIMSOC <- MIMSOC
+# # ggplot(plot_data, aes(x=MIMSOC, y=Wieder_2015_MIMSOC)) + geom_point(size=3) +
+# #   geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
+# #   xlab("Pierson_STODE\nMIMSOC") +
+# #   ylab("Wieder et al. 2015 - Sandbox\nMIMSOC") +
+# #   theme_minimal()
 
