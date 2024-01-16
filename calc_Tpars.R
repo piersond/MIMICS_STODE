@@ -11,8 +11,6 @@
 # -- fWmethod is describes how to calculate fW 0=none 1=corpse, 2=calibrated 
 # -- historic is a logical for using historic MAT to modify Vslope & Vint
 
-# Todo, put methods on the parameter file ?
-# fWmethod, historic, fixed_fMET, tauMethod
 calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
                              theta_liq=NA, theta_frzn=NA) {
   
