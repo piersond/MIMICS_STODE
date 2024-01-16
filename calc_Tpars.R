@@ -11,9 +11,7 @@
 # -- fWmethod is describes how to calculate fW 0=none 1=corpse, 2=calibrated 
 # -- historic is a logical for using historic MAT to modify Vslope & Vint
 
-# TODO add fW calculation to this series of calculations
-calc_Tpars_Conly <- function(fWmethod = 0, historic=FALSE, LiDET_fMET=FALSE, 
-                             ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
+calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
                              theta_liq=NA, theta_frzn=NA) {
   
   # Set lig:N value if not given
@@ -48,10 +46,10 @@ calc_Tpars_Conly <- function(fWmethod = 0, historic=FALSE, LiDET_fMET=FALSE,
   
 
   # set fMET
-  if(!LiDET_fMET){
+  if(!fixed_fMET){
     fMET  <- fmet_p[1] * (fmet_p[2] - fmet_p[3] * LIG_N)    
   } else {
-    # ONLY for model validation against MIMICS et al. 2015 Sandbox 
+    # Fixed Fmet, ONLY for model validation against MIMICS et al. 2015 Sandbox 
     fMET <- 0.3846423
   }
 
@@ -60,14 +58,20 @@ calc_Tpars_Conly <- function(fWmethod = 0, historic=FALSE, LiDET_fMET=FALSE,
   EST_LIT <- (ANPP / (365*24)) * 1e3 / 1e4
 
   # ------------ calculate time varying parameters ---------------
-
   Vmax     <- exp(TSOI * Vslope + Vint) * aV * fW   #<-- Moisture scalar applied
   Km       <- exp(TSOI * Kslope + Kint) * aK
   
-  Tau_MOD1 <- sqrt(ANPP/Tau_MOD[1])         
+  if (tauMethod == 'NPP') {
+    Tau_MOD1 <- sqrt(ANPP/Tau_MOD[1])         
+    Tau_MOD1[Tau_MOD1 < Tau_MOD[2]] <- Tau_MOD[2]
+    Tau_MOD1[Tau_MOD1 > Tau_MOD[3]] <- Tau_MOD[3] 
+    beta=1 # turns off beta
+  } else if (tauMethod=='beta') {
+    Tau_MOD1 <- 1. # turns off NPP efffects on turnover
+    beta=beta[1] # use Kat's density dependent function         
+  }
+  
   Tau_MOD2 <- Tau_MOD[4]                        
-  Tau_MOD1[Tau_MOD1 < Tau_MOD[2]] <- Tau_MOD[2]
-  Tau_MOD1[Tau_MOD1 > Tau_MOD[3]] <- Tau_MOD[3] 
   
   tau <- c(tau_r[1]*exp(tau_r[2]*fMET), 
            tau_K[1]*exp(tau_K[2]*fMET))   
@@ -107,7 +111,8 @@ calc_Tpars_Conly <- function(fWmethod = 0, historic=FALSE, LiDET_fMET=FALSE,
   Tpars <- list(I = I, VMAX = VMAX, KM = KM, CUE = CUE,
                  fPHYS = fPHYS, fCHEM = fCHEM, fAVAI = fAVAI, FI = FI, 
                  tau = tau, LITmin = LITmin, SOMmin = SOMmin, MICtrn = MICtrn, 
-                 desorb = desorb, DEsorb = DEsorb, OXIDAT = OXIDAT, KO = KO)
+                 desorb = desorb, DEsorb = DEsorb, OXIDAT = OXIDAT, KO = KO, 
+                 beta=beta)
   
   return(Tpars)
 }
