@@ -69,9 +69,7 @@ MIMICS_SS <- function(df){
   # function calculates fMET with LIG_N if provided in input data.
   Tpars <- calc_Tpars_Conly(ANPP=ANPP, fCLAY=fCLAY, TSOI=TSOI, MAT=MAT,     
                             CN=CN, LIG=LIG, LIG_N=LIG_N,
-                            theta_liq=theta_liq, theta_frzn=theta_frzn)  #<---- IMPORTANT USER OPTIONS HERE
-                            #fWmethod=df$fWmethod, historic=df$historic, #<--- Moved to parameter file
-                            #fixed_fMET=df$fixed_fMET, tauMethod=df$tauMethod)
+                            theta_liq=theta_liq, theta_frzn=theta_frzn) 
     
   # Create arrays to hold output
   lit     <- Tpars$I

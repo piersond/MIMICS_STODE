@@ -60,7 +60,6 @@ calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
   EST_LIT <- (ANPP / (365*24)) * 1e3 / 1e4
 
   # ------------ calculate time varying parameters ---------------
-  # aV = aV*0.3 # increase decay rates
   Vmax     <- exp(TSOI * Vslope + Vint) * aV * fW   #<-- Moisture scalar applied
   Km       <- exp(TSOI * Kslope + Kint) * aK
   
@@ -71,8 +70,7 @@ calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
     beta=1 # turns off beta
   } else if (tauMethod=='beta') {
     Tau_MOD1 <- 1. # turns off NPP efffects on turnover
-    # Todo, put beta on the parameter file
-    beta=1.5 # use Kat's density dependent function         
+    beta=beta[1] # use Kat's density dependent function         
   }
   
   Tau_MOD2 <- Tau_MOD[4]                        

@@ -14,7 +14,7 @@ CUE     <- c(0.55, 0.25, 0.75, 0.35)
 tau_r   <- c(0.00052, 0.3)
 tau_K   <- c(0.00024, 0.1)
 Tau_MOD <- c(100, 0.8, 1.2, 2)
-beta    <- 1.5 # only used if tauMethod='beta'
+beta    <- c(1.5) # only used if tauMethod='beta'
 fPHYS_r <- c(0.3, 1.3)
 fPHYS_K <- c(0.2, 0.8)
 fCHEM_r <- c(0.1, -3, 1)
