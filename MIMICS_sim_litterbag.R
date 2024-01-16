@@ -71,8 +71,7 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, dailyInput=NA, nspin_yrs=10, nspin
     # For recalc of Tpars from daily forcing data
     if (!is.na(dailyInput)) {
       # Set daily Tpars from daily state variables in "dailyInput" dataframe (added in function arguments)
-      Tpars_mod = calc_Tpars(fWmethod = 0, historic=FALSE, LiDET_fMET=FALSE, #<-- ENSURE these settings match the ss run
-                             ANPP = dailyInput$ANPP[d], 
+      Tpars_mod = calc_Tpars( ANPP = dailyInput$ANPP[d], #<-- ENSURE these settings match the ss run
                              fCLAY = dailyInput$fCLAY[d], 
                              TSOI = dailyInput$TSOI[d], 
                              MAT = dailyInput$MAT[d], 
@@ -252,3 +251,4 @@ ggplot() +
   labs(color="LiDET\nLitter Type") +
   ggtitle("MIMICS Litter Bag Simulation") +
   theme_bw()
+
