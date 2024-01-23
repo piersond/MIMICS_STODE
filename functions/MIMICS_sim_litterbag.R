@@ -10,7 +10,7 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, dailyInput=NA, nspin_yrs=10, nspin
   
   if(verbose){
     print("-------------------------------------------------------")
-    print(paste0("Starting ", forcing_df$Site, " - ", litBAG[1]))
+    print(paste0("Starting ", forcing_df$SITE, " - ", litBAG[1]))
     print("-------------------------------------------------------")
   }
   
@@ -126,7 +126,7 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, dailyInput=NA, nspin_yrs=10, nspin
   LITBAG_out <- LITBAG_out * depth * 1e4 / 1e6 # Soil depth and unit conversion 
   LITBAG_out <- as.data.frame(t(LITBAG_out))
   colnames(LITBAG_out) <- c("LITBAGm", "LITBAGs", "LITm", "LITs", "MICr", "MICk", "SOMp", "SOMc", "SOMa")
-  LITBAG_out <- cbind(data.frame(SITE = forcing_df$Site,
+  LITBAG_out <- cbind(data.frame(SITE = forcing_df$SITE,
                                  Litter_Type = as.character(litBAG[1]),
                                  DAY=seq(1:nrow(LITBAG_out))), LITBAG_out)
   
