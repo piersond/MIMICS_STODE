@@ -50,7 +50,7 @@ MIMICS_SS <- function(df){
   Tpars <- calc_Tpars_Conly(ANPP=ANPP, fCLAY=fCLAY, TSOI=TSOI, MAT=MAT,     
                             CN=CN, LIG=LIG, LIG_N=LIG_N,
                             theta_liq=theta_liq, theta_frzn=theta_frzn) 
-    
+  
   # Create arrays to hold output
   lit     <- Tpars$I
   mic     <- Tpars$I
@@ -64,23 +64,24 @@ MIMICS_SS <- function(df){
               MIC_1 = mic[1], MIC_2 = mic[2], 
               SOM_1 = som[1], SOM_2 = som[2], SOM_3 = som[3])
   
-  ## Set global parameters to ensure passing of variables to stode function
-  .GlobalEnv$VMAX <- Tpars$VMAX
-  .GlobalEnv$KM <- Tpars$KM
-  .GlobalEnv$fPHYS <- Tpars$fPHYS
-  .GlobalEnv$fCHEM <- Tpars$fCHEM
-  .GlobalEnv$fAVAI <- Tpars$fAVAI
-  .GlobalEnv$I <- Tpars$I
-  .GlobalEnv$tau <- Tpars$tau
-  .GlobalEnv$LITmin <- Tpars$LITmin
-  .GlobalEnv$SOMmin <- Tpars$SOMmin
-  .GlobalEnv$MICtrn <- Tpars$MICtrn
-  .GlobalEnv$desorb <- Tpars$desorb
-  .GlobalEnv$DEsorb <- Tpars$DEsorb
-  .GlobalEnv$OXIDAT <- Tpars$OXIDAT
-  .GlobalEnv$beta <- Tpars$beta
+  # ## Set global parameters to ensure passing of variables to stode function
+  # .GlobalEnv$VMAX <- Tpars$VMAX
+  # .GlobalEnv$KM <- Tpars$KM
+  # .GlobalEnv$fPHYS <- Tpars$fPHYS
+  # .GlobalEnv$fCHEM <- Tpars$fCHEM
+  # .GlobalEnv$fAVAI <- Tpars$fAVAI
+  # .GlobalEnv$I <- Tpars$I
+  # .GlobalEnv$tau <- Tpars$tau
+  # .GlobalEnv$LITmin <- Tpars$LITmin
+  # .GlobalEnv$SOMmin <- Tpars$SOMmin
+  # .GlobalEnv$MICtrn <- Tpars$MICtrn
+  # .GlobalEnv$desorb <- Tpars$desorb
+  # .GlobalEnv$DEsorb <- Tpars$DEsorb
+  # .GlobalEnv$OXIDAT <- Tpars$OXIDAT
+  # .GlobalEnv$beta <- Tpars$beta
+  # 
+  # # ------------RUN THE MODEL-------------
   
-  # ------------RUN THE MODEL-------------
   test  <- stode(y = Ty, time = 1e7, fun = RXEQ, parms = Tpars, positive = TRUE)
   
   ### Calc and get MIMICS output 
@@ -128,3 +129,9 @@ MIMICS_SS_format <- function(MIMICS_SS_output) {
   return(MIMout_single_tbl)
 }
 
+
+########################################################################
+# Ftn that combines MIMICS_SS with format and returns pools dataframe
+########################################################################
+
+MIMICS_SS_pools <- function(df) {return(MIMICS_SS(df) %>% MIMICS_SS_format())}

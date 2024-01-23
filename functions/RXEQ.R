@@ -8,9 +8,9 @@ RXEQ <- function(t, y, pars) {
   #y = Ty 
   #t = 1e6 
   #pars = Tpars
-  
+
   with (as.list(c(y, pars)),{
-    
+
     #Flows to and from MIC_1
     LITmin[1] = MIC_1 * VMAX[1] * LIT_1 / (KM[1] + MIC_1)   #MIC_1 decomp of MET lit
     LITmin[2] = MIC_1 * VMAX[2] * LIT_2 / (KM[2] + MIC_1)   #MIC_1 decomp of STRUC lit
@@ -44,8 +44,10 @@ RXEQ <- function(t, y, pars) {
     
     dSOM_3 = MICtrn[3] + MICtrn[6] + DEsorb + OXIDAT - SOMmin[1] - SOMmin[2]
     
-    list(c(dLIT_1, dLIT_2, dMIC_1, dMIC_2, dSOM_1, dSOM_2, dSOM_3),
-        c(CO2r=CO2_1, CO2K=CO2_2))
+    output <- list(c(dLIT_1, dLIT_2, dMIC_1, dMIC_2, dSOM_1, dSOM_2, dSOM_3),
+                   c(CO2r=CO2_1, CO2K=CO2_2))
+    
+    return(output)
   })
 }
 
