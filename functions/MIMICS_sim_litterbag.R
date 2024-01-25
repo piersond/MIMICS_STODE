@@ -1,12 +1,18 @@
 
-MIMICS_LITBAG <- function(forcing_df, litBAG, dailyInput=NA, nspin_yrs=10, nspin_days=200, litadd_day=143, verbose=T){
+MIMICS_LITBAG <- function(forcing_df, litBAG, dailyInput=NA, loop_dailyInput=TRUE, nspin_yrs=10, nspin_days=200, litadd_day=143, verbose=T){
   
   #DEBUG
-  #forcing_df <- LTER[6,]
-  #litBAG <- BAGS[1,]
-  #nspin_yrs <- 10
-  #nspin_days <- 200
-  #litadd_day <- 143
+  # forcing_df <- LTER[6,]
+  # litBAG <- BAGS[1,]
+  # nspin_yrs <- 10
+  # nspin_days <- 200
+  # litadd_day <- 143
+  # dailyInput <- dailyInputs
+  # loop_dailyInput = TRUE
+  # verbose = TRUE
+  
+  # Convert forcing data column names to uppercase
+  colnames(forcing_df) <- toupper(colnames(forcing_df))
   
   if(verbose){
     print("-------------------------------------------------------")
@@ -42,16 +48,22 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, dailyInput=NA, nspin_yrs=10, nspin
 
   for (d in 1:nday)  { 
     # For recalc of Tpars from daily forcing data
-    if (!is.na(dailyInput)) {
-      # Set daily Tpars from daily state variables in "dailyInput" dataframe (added in function arguments)
-      Tpars_mod = calc_Tpars( ANPP = dailyInput$ANPP[d], #<-- ENSURE these settings match the ss run
-                             fCLAY = dailyInput$fCLAY[d], 
-                             TSOI = dailyInput$TSOI[d], 
-                             MAT = dailyInput$MAT[d], 
-                             LIG_N = dailyInput$LIG_N[d],
-                             CN = dailyInput$CN[d],  # Only needed if LIG_N not supplied 
-                             LIG = dailyInput$LIG[d],  # Only needed if LIG_N not supplied 
-                             theta_liq = dailyInput$GWC[d], 
+    if (all(!is.na(dailyInput))) {
+      
+      # Loop daily input (i.e., repeat 365 rows in daily input)
+      if(loop_dailyInput){
+        input_doy = (d - 1) %% nrow(dailyInput) + 1        
+      } else {input_doy <- d}
+
+      # Set daily Tpars from "dailyInput" dataframe (add in the function arguments)
+      Tpars_mod = calc_Tpars_Conly(ANPP = dailyInput$ANPP[input_doy]/2,
+                             fCLAY = dailyInput$CLAY[input_doy]/100, 
+                             TSOI = dailyInput$TSOI[input_doy], 
+                             MAT = dailyInput$MAT[input_doy], 
+                             LIG_N = dailyInput$LIG_N[input_doy],
+                             CN = dailyInput$CN[input_doy],  # Only needed if LIG_N not supplied 
+                             LIG = dailyInput$LIG[input_doy],  # Only needed if LIG_N not supplied 
+                             theta_liq = dailyInput$GWC[input_doy]/100, 
                              theta_frzn = 0) # Change to column name if frozen water content is available 
     } else {
       # Use ss Tpars (i.e., same forcing variables for each sim day)

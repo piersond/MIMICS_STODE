@@ -67,7 +67,7 @@ calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
     Tau_MOD1[Tau_MOD1 > Tau_MOD[3]] <- Tau_MOD[3] 
     beta=1 # turns off beta
   } else if (tauMethod=='beta') {
-    Tau_MOD1 <- 1. # turns off NPP efffects on turnover
+    Tau_MOD1 <- 1 # turns off NPP effects on turnover
     beta=beta[1] # use Kat's density dependent function         
   }
   
@@ -75,7 +75,7 @@ calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
   
   tau <- c(tau_r[1]*exp(tau_r[2]*fMET), 
            tau_K[1]*exp(tau_K[2]*fMET))   
-  tau <- tau * Tau_MOD1 * Tau_MOD2 * Tau_MULT #* fW #<-- TODO Should this be moisture dependent? [DP 1/12/2024]
+  tau <- tau * Tau_MOD1 * Tau_MOD2 * Tau_MULT 
   
   fPHYS    <- c(fPHYS_r[1] * exp(fPHYS_r[2]*fCLAY), 
                 fPHYS_K[1] * exp(fPHYS_K[2]*fCLAY)) 	            
