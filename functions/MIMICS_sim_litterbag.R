@@ -64,7 +64,8 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, dailyInput=NA, loop_dailyInput=TRU
                              CN = dailyInput$CN[input_doy],  # Only needed if LIG_N not supplied 
                              LIG = dailyInput$LIG[input_doy],  # Only needed if LIG_N not supplied 
                              theta_liq = dailyInput$GWC[input_doy]/100, 
-                             theta_frzn = 0) # Change to column name if frozen water content is available 
+                             theta_frzn = 0,  # Change to column name if frozen water content is available
+                             W_SCALAR = dailyInput$W_SCALAR[input_doy]) 
     } else {
       # Use ss Tpars (i.e., same forcing variables for each sim day)
       Tpars_mod = Tpars

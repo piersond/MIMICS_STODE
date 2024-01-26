@@ -8,11 +8,11 @@
 # Assumes:
 # -- ANPP is gC, not gDW
 # -- Clay is a fraction (0-1)
-# -- fWmethod is describes how to calculate fW 0=none 1=corpse, 2=calibrated 
+# -- fWmethod is describes how to calculate fW 0=none 1=corpse, 2=calibrated, 3=moisture scalar from other model
 # -- historic is a logical for using historic MAT to modify Vslope & Vint
 
 calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
-                             theta_liq=NA, theta_frzn=NA) {
+                             theta_liq=NA, theta_frzn=NA, W_SCALAR=NA) {
   
   # Set lig:N value if not given
   if (is.na(LIG_N)) {
@@ -36,6 +36,8 @@ calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
     fW = (theta_liq^fW_p1 * air_filled_porosity^fW_p2)/fW_p3
     fW = max(0.05, fW) 
     
+  } else if (fWmethod==3) {
+    fW=W_SCALAR
   }
   
   # For historic MAT dependent kinetics
