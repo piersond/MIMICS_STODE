@@ -76,18 +76,17 @@ calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
   Tau_MOD2 <- Tau_MOD[4]                        
   
   tau <- c(tau_r[1]*exp(tau_r[2]*fMET), 
-           tau_K[1]*exp(tau_K[2]*fMET))   
-  tau <- tau * Tau_MOD1 * Tau_MOD2 * Tau_MULT 
+           tau_K[1]*exp(tau_K[2]*fMET)) 
+  
+  tau <- tau * Tau_MOD1 * Tau_MOD2 * tau_MULT 
   
   fPHYS    <- c(fPHYS_r[1] * exp(fPHYS_r[2]*fCLAY), 
-                fPHYS_K[1] * exp(fPHYS_K[2]*fCLAY)) 	            
+                fPHYS_K[1] * exp(fPHYS_K[2]*fCLAY)) * fPHYS_MULT 	            
   fCHEM    <- c(fCHEM_r[1] * exp(fCHEM_r[2]*fMET) * fCHEM_r[3], 
                 fCHEM_K[1] * exp(fCHEM_K[2]*fMET) * fCHEM_K[3]) 	
   fAVAI    <- 1 - (fPHYS + fCHEM)
   
-  desorb   <- fSOM_p[1] * exp(fSOM_p[2]*(fCLAY))                  
-  desorb   <- desorb * desorb_MULT
-  fPHYS    <- fPHYS * fPHYS_MULT
+  desorb   <- fSOM_p[1] * exp(fSOM_p[2]*(fCLAY)) * desorb_MULT                  
   
   pSCALAR  <- PHYS_scalar[1] * exp(PHYS_scalar[2]*(sqrt(fCLAY)))  #Scalar for texture effects on SOMp
   

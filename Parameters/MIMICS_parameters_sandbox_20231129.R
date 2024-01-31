@@ -39,7 +39,7 @@ fixed_fMET=FALSE #calculate fMET based on litter chemistry
 tauMethod='NPP'  #'NPP' and 'beta' accepted
 
 #Set default multipliers
-Tau_MULT = 1
+tau_MULT = 1
 desorb_MULT = 1
 fPHYS_MULT = 1
 
