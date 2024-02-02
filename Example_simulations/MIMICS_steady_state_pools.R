@@ -35,10 +35,7 @@ source("parameters/MIMICS_parameters_ReynoldsCreek_20240130.R")  #--> For Reynol
 # Forcing data for forcing_data sites
 #forcing_data <- read.csv("example_simulations/data/LTER_SITE_1.csv", as.is=T)
 forcing_data <- read.csv("example_simulations/data/ReynoldsCreek_SOC_HiRes.csv", as.is=T, check.names = T)
-colnames(forcing_data)[1] <- "Set"
-
-#forcing_data$CLAY <- forcing_data$estCLAY
-#forcing_data$ANPP <- forcing_data$ANPP
+colnames(forcing_data)[1] <- "Set"  # Fix for first column name import error
 
 
 #---------------------------------------------------------------------------

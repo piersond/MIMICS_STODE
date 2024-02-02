@@ -39,14 +39,14 @@ forcing_data$FID <- seq(1,nrow(forcing_data),1)
 ####################################
 
 # Set desired number of random parameter runs
-MIM_runs <- 10000
+MIM_runs <- 100
 
 ### Create random parameter dataframe
 #------------------------------------------------------------------------------
 #  !!! NOTE, when adding or removing parameters, must setup coressponding 
 #      parameter values here, in MIMrepeat() and in "set_parameter_defaults.R
 
-rand_params <- data.frame(Vslope_x = runif(MIM_runs,1, 1),   #0.5, 2
+rand_params <- data.frame(Vslope_x = runif(MIM_runs,0.7, 1.3),   #0.5, 2
                           Vint_x = runif(MIM_runs, 1, 1)#,  #0.8, 1.3
                           # Kslope_x = runif(MIM_runs, 0.2, 1.2),#,  #0.5, 2  
                           # Kint_x = runif(MIM_runs, 0.2, 1.2)#, #0.5,2 

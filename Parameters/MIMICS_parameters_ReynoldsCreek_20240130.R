@@ -30,6 +30,11 @@ PHYS_scalar <- c(2, -2, NA, NA, NA, NA)
 FI      <- c(0.05, 0.05)
 fmet_p <- c(1, 0.85, 0.013)
 
+#Set default multipliers
+tau_MULT <- 0.455164391 #<----MULTIPLIER
+desorb_MULT <- 0.078479435  #<----MULTIPLIER
+fPHYS_MULT <- 0.336044881  #<----MULTIPLIER
+
 depth <- 30 # set soil depth
 h2y        <- 24*365
 MICROtoECO <- depth * 1e4 * 1e-3  # mgC/cm3 to g/m2
@@ -44,9 +49,6 @@ historic <- FALSE   #modify Vmax based on historic MAT
 fixed_fMET <- FALSE #calculate fMET based on litter chemistry
 tauMethod <- 'NPP'  #'NPP' and 'beta' accepted
 
-#Set default multipliers
-tau_MULT <- 0.455164391 #<----MULTIPLIER
-desorb_MULT <- 0.078479435  #<----MULTIPLIER
-fPHYS_MULT <- 0.336044881  #<----MULTIPLIER
+
 
 
