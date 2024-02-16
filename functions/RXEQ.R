@@ -10,7 +10,7 @@ RXEQ <- function(t, y, pars) {
   #pars = Tpars
 
   with (as.list(c(y, pars)),{
-
+    
     #Flows to and from MIC_1
     LITmin[1] = MIC_1 * VMAX[1] * LIT_1 / (KM[1] + MIC_1)   #MIC_1 decomp of MET lit
     LITmin[2] = MIC_1 * VMAX[2] * LIT_2 / (KM[2] + MIC_1)   #MIC_1 decomp of STRUC lit
@@ -26,7 +26,7 @@ RXEQ <- function(t, y, pars) {
     MICtrn[5] = MIC_2^beta * tau[2]  * fCHEM[2]             #MIC_2 turnover to CHEMICAL  SOM  
     MICtrn[6] = MIC_2^beta * tau[2]  * fAVAI[2]             #MIC_2 turnover to AVAILABLE SOM  
     SOMmin[2] = MIC_2 * VMAX[6] * SOM_3 / (KM[6] + MIC_2)   #decomp of SOMa by MIC_2
-    
+
     DEsorb    = SOM_1 * desorb  #* (MIC_1 + MIC_2)  	#desorbtion of PHYS to AVAIL (function of fCLAY)
     OXIDAT    = ((MIC_1 * VMAX[2] * SOM_2 / (KO[1]*KM[2] + MIC_1)) +
                    (MIC_2 * VMAX[5] * SOM_2 / (KO[2]*KM[5] + MIC_2)) )  #oxidation of C to A

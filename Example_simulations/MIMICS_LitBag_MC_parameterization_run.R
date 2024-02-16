@@ -9,6 +9,7 @@ library(rootSolve)
 library(purrr)
 library(furrr)
 
+setwd("C:/github/MIMICS_STODE")
 
 ########################################
 # Load MIMICS data and ftns
@@ -49,7 +50,7 @@ BAGS_mean <- BAGS %>% filter(TYPE == "mean")
 ####################################
 
 # Set desired number of random parameter runs
-MIM_runs <- 10
+MIM_runs <- 6
 
 ### Create random parameter dataframe
 ## Parameter range informed by range observed over 10+ MCMC analysis results
@@ -73,7 +74,7 @@ rand_params$run_num <- seq(1,MIM_runs,1)
 
 # Set number of cores to use
 no_cores <- availableCores() - 1
-plan(multisession, gc = TRUE, workers = no_cores)
+plan(multicore, gc = TRUE, workers = no_cores) #vs. multisession
 
 # Run MIMICS!
 
@@ -106,4 +107,9 @@ gc()
 ##########################################
 # Save MC output data - for use with computing clusters
 ##########################################
-#saveRDS(MC_MIMICS, paste0("temp/MSBio_MC_", as.character(MIM_runs), "_", format(Sys.time(), "%Y%m%d_%H%M%S_"),  ".rds"))
+saveRDS(MC_MIMICS, paste0("MSBio_MC_", as.character(MIM_runs), "_", format(Sys.time(), "%Y%m%d_%H%M%S_"),  ".rds"))
+
+
+#--- NOTES ---------------------
+#3 runs = 1.16 on 7 poor laptop cores
+#6 runs = 2.60

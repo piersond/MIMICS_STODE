@@ -42,8 +42,10 @@ calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
   
   # For historic MAT dependent kinetics
   if (historic==TRUE) {
-    Vslope = Vslope + (MAT*0.00104) 
-    Vint = Vint - (MAT*0.0228) 
+    Vslope = Vslope + (MAT*Vh_MOD[1])   #<--- MSBio Proportional change
+    Vint = Vint - (MAT*Vh_MOD[2])       #<--- MSBio Proportional change
+    #Vslope = Vslope * (Vslope_MOD[1]*MAT + Vslope_MOD[2])   #<--- Old MSBio specific
+    #Vint = Vint * (Vint_MOD[1]*MAT + Vint_MOD[2])           #<--- Old MSBio specific
   }
   
 
@@ -78,7 +80,7 @@ calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA,
   tau <- c(tau_r[1]*exp(tau_r[2]*fMET), 
            tau_K[1]*exp(tau_K[2]*fMET)) 
   
-  tau <- tau * Tau_MOD1 * Tau_MOD2 * tau_MULT 
+  tau <- tau * Tau_MOD1 * Tau_MOD2 * tau_MULT
   
   fPHYS    <- c(fPHYS_r[1] * exp(fPHYS_r[2]*fCLAY), 
                 fPHYS_K[1] * exp(fPHYS_K[2]*fCLAY)) * fPHYS_MULT 	            
