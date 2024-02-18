@@ -27,16 +27,17 @@ MIMICS_SS <- function(df){
   TSOI <- df$TSOI
   
   ### Bring in lig:N forcing data
-  LIG_N <- df$LIG_N
-  LIG <- df$LIG
-  CN <- df$CN
+  LIG_N <- try_import_column(df, "LIG_N")
+  LIG <- try_import_column(df, "LIG")
+  CN <- try_import_column(df, "CN")
 
   # Bring in soil moisture information
-  theta_liq  <- df$GWC/100  # GWC = Gravimetric water content
+  GWC <- try_import_column(df, "GWC")
+  theta_liq  <- GWC/100  # GWC = Gravimetric water content
   theta_frzn <- 0           # Not used here. TODO Needs validation. 
 
   ### Bring in mean annual temperature data
-  MAT <- df$MAT  
+  MAT <- try_import_column(df, "MAT") 
   
   # Use TSOI if 'MAT' column is not in forcing data
   if(is.null(MAT)){
@@ -44,7 +45,7 @@ MIMICS_SS <- function(df){
   }
   
   #Bring in W_SCALAR if present
-  W_SCALAR = df$W_SCALAR
+  W_SCALAR = try_import_column(df, "W_SCALAR")
 
   ############################################################
   # MIMICS MODEL CODE STARTS HERE
@@ -100,7 +101,7 @@ MIMICS_SS <- function(df){
   MIMout[[2]] <- Tpars                                      # MIMICS parameters used for/from simulation
   MIMout[[3]] <- df                                         # Forcing dataframe
   MIMout[[4]] <- as.numeric(test[[2]]) * depth *1e4 / 1e6   # CO2-r & CO2-k pools 
-  
+
   return(MIMout)
 }
 
@@ -138,3 +139,13 @@ MIMICS_SS_format <- function(MIMICS_SS_output) {
 ########################################################################
 
 MIMICS_SS_pools <- function(df) {return(MIMICS_SS(df) %>% MIMICS_SS_format())}
+
+
+#
+try_import_column <- function(df, column_name) {
+  if (column_name %in% colnames(df)) {
+    return(df[[column_name]])
+  } else {
+    return(rep(NULL, length(df)))
+  }
+}

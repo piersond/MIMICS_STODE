@@ -1,5 +1,5 @@
 
-MIMICS_LITBAG <- function(forcing_df, litBAG, dailyInput=NA, loop_dailyInput=TRUE, nspin_yrs=10, nspin_days=200, litadd_day=143, verbose=T){
+MIMICS_LITBAG <- function(forcing_df, SS_output=NA, litBAG, dailyInput=NA, loop_dailyInput=TRUE, nspin_yrs=10, nspin_days=200, litadd_day=143, verbose=T){
   
   #DEBUG
   # forcing_df <- LTER[6,]
@@ -21,7 +21,11 @@ MIMICS_LITBAG <- function(forcing_df, litBAG, dailyInput=NA, loop_dailyInput=TRU
   }
   
   # Get MIMICS steady_state output
-  MIMss <- MIMICS_SS(forcing_df)
+  if(any(is.na(SS_output))) {
+    MIMss <- MIMICS_SS(forcing_df)
+  } else {
+    MIMss <- SS_output
+  }
 
   # Create dataframe to store MIMICS pools over timesteps
   MIMfwd = MIMss[[1]]
