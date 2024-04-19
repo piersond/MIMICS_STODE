@@ -7,7 +7,6 @@ library(Metrics)
 ## Set working drive
 setwd("C:/GitHub/MIMICS_STODE")
 
-
 #----------------------------------------
 # Load necessary model components
 #----------------------------------------
