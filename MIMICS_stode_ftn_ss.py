@@ -6,24 +6,25 @@ import matplotlib.pyplot as plt
 import dask.dataframe as dd
 from dask.multiprocessing import get
 import time
+from multiprocesspandas import applyparallel
 from RXEQ import RXEQ
+import matplotlib
 
 
 # Set default parameter values
-Vslope = np.tile(np.array([0.063]), 6).astype(float)
-Vint = np.tile(np.array([5.47]), 6).astype(float)
+Vslope = np.tile(np.array([0.063]), 6).astype(float)  #MCMC
+Vint = np.tile(np.array([5.47]), 6).astype(float)     #MCMC
 aV = np.tile(np.array([0.000008]), 6).astype(float)
-Kslope = np.tile(np.array([0.025, 0.035, 0.025]), 2).astype(float)
-Kint = np.tile(np.array([3.19]), 6).astype(float)
+Kslope = np.tile(np.array([0.025, 0.035, 0.025]), 2).astype(float)  #MCMC
+Kint = np.tile(np.array([3.19]), 6).astype(float)   #MCMC
 aK      = np.repeat(np.array([10]), 6).astype(float)
 vMOD    = np.array([10, 2, 10, 3, 3, 2]).astype(float)
 kMOD    = np.array([8, 2, 4, 2, 4, 6]).astype(float)
 KO      = np.array([6, 6]).astype(float)
-CUE     = np.array([0.55, 0.25, 0.75, 0.35]).astype(float)
+CUE     = np.array([0.55, 0.25, 0.75, 0.35]).astype(float) #MCMC
 tau_r   = np.array([0.00052, 0.3]).astype(float)
 tau_K   = np.array([0.00024, 0.1]).astype(float)
 Tau_MOD = np.array([100, 0.8, 1.2, 2]).astype(float)
-Tau_MULT = 1
 fPHYS_r = np.array([0.3, 1.3]).astype(float)
 fPHYS_K = np.array([0.2, 0.8]).astype(float)
 fCHEM_r = np.array([0.1, -3, 1]).astype(float)
@@ -37,10 +38,25 @@ h2y = 24 * 365
 MICROtoECO = depth * 1e4 * 1e-3  # mgC/cm3 to g/m2
 
 #Set default multipliers
-Tau_MULT = 1
-desorb_MULT = 1
-fPHYS_MULT = 1
+Tau_MULT = 1  #MCMC
+desorb_MULT = 1  #MCMC
+fPHYS_MULT = 1  #MCMC
 
+#-----------------------------------------
+# SET PARAMETER FIT MULTIPLIERS
+Vslope = Vslope * 3.853107615
+Vint = Vint * 1.16299943
+Kslope = Kslope * 0.839868442
+Kint = Kint * 1.546675755 
+CUE = CUE * 0.544205741
+Tau_MULT = 0.455164391 
+desorb_MULT = 0.078479435  
+fPHYS_MULT = 0.336044881  
+#------------------------------------------
+
+
+# Define MIMICS model functions
+### MIMICS steady state solver
 def MIMICS_SS(df, multi=True): 
     
     if multi:
@@ -125,14 +141,30 @@ def MIMICS_SS(df, multi=True):
     sol = solve_ivp(lambda t,y: RXEQ(y, 1, I, VMAX, KM, CUE, fPHYS, fCHEM, fAVAI, FI, tau, LITmin, SOMmin, MICtrn, desorb, DEsorb, OXIDAT, KO), 
                     t_span, y0, method='RK45', t_eval=t_eval)
     
-    return(sol.y.transpose()[0] * depth *1e4 / 1e6)    
+    #return(sol.y.transpose()[0] * depth *1e4 / 1e6)    
+    result = sol.y.transpose()[0] * depth * 1e4 / 1e6
+    return pd.Series(result, index=['LITm', 'LITs', 'MICr', 'MICk', 'SOMp', 'SOMc', 'SOMa'])
+
+### MIMICS steady state pool calculation and format function
+def MIMICS_SS_format(mimout_c_pools):
+    mimout_c_pools["MIMSOC"] = mimout_c_pools[["LITm", "LITs", "MICr", "MICk", "SOMp", "SOMc", "SOMa"]].sum(axis=1)
+    mimout_c_pools["MIMLIT"] = mimout_c_pools["LITm"] + mimout_c_pools["LITs"]
+    mimout_c_pools["MIMMIC"] = mimout_c_pools["MICr"] + mimout_c_pools["MICk"]
+    mimout_c_pools["MIC_ratio"] = mimout_c_pools["MICr"] / mimout_c_pools["MICk"]
+    return mimout_c_pools
 
 
-####################
-### EXAMPLES 
-####################
+#############################
+### EXAMPLE SIMULATIONS
+#############################
 
-df = pd.read_csv('Data/RCrk_SOC_all_raw.csv', delimiter=',')
+df = pd.read_csv('Data/MC_cross-val_data.csv', delimiter=',')
+
+# Add unique ID
+df['UID'] = df.index + 1
+
+# Filter set == "Validation"
+df = df[df["Set"] == "VAL"]
 
 ### Method 1: Regular
 # start_time = time.time()
@@ -140,15 +172,53 @@ df = pd.read_csv('Data/RCrk_SOC_all_raw.csv', delimiter=',')
 # print("--- %s seconds ---" % (time.time() - start_time)) 
 # print(MIMout_set)
 
-### Method 2: With multiprocessing
-from multiprocesspandas import applyparallel
+### Method 2: With multiprocessing (!!! ERROR IN ARRAY SHAPE NEEDS TO BE FIXED to use multi=True)
 if __name__ == '__main__':
     tstart = time.time()   
-    MIMout_set = df.groupby(["Field1"]).apply_parallel(lambda row: MIMICS_SS(row, multi=False), 
+    MIMout_raw = df.groupby(["UID"]).apply_parallel(lambda row: MIMICS_SS(row, multi=False), 
                                                        num_processes=7) #<--- Adjust based on CPU power
     print(time.time() - tstart)
-    print(MIMout_set)
+    print(MIMout_raw)
+    
+    # Save output
+    MIMout_raw.to_csv('MIMICS_SS_raw_output.csv', index=False)
+    
+    # Format and save MIMICS C pools
+    MIMout_ss_pools = MIMICS_SS_format(MIMout_raw)
+    
+    MIMout_ss_pools.to_csv('MIMICS_SS_pools_output.csv', index=False)
 
 
-
-
+    #########################
+    # SOC QA plot using matplotlib
+    #########################
+    
+    # Get r^2 and RMSE values for the plot
+    # Calculate r^2
+    r2 = np.corrcoef(df["SOC"], MIMout_ss_pools["MIMSOC"])[0, 1] ** 2
+    # Calculate RMSE
+    rmse = np.sqrt(np.mean((df["SOC"] - MIMout_ss_pools["MIMSOC"]) ** 2))
+    
+    # Plot MIMICS SOC vs. measured SOC
+    plt.figure(figsize=(8, 8))  
+    plt.scatter(df["SOC"], MIMout_ss_pools["MIMSOC"], color='black', alpha=0.5)
+    plt.xlabel('Measured SOC (g/m2)')
+    plt.ylabel('MIMICS SOC (g/m2)')
+    plt.title('MIMICS SOC vs. Measured SOC')
+    
+    # Add r^2 and RMSE to the plot
+    plt.text(0.1, 0.9, f'R² = {r2:.2f}', transform=plt.gca().transAxes)
+    plt.text(0.1, 0.85, f'RMSE = {rmse:.2f}', transform=plt.gca().transAxes)
+    
+    # Add 1:1 line
+    plt.plot([0, 100], [0, 100], color='green', linestyle='--')
+    
+    # Set limits and grid
+    plt.xlim(0, 15)
+    plt.ylim(0, 15)
+    plt.grid()
+    plt.show()
+    
+    
+    
+    
